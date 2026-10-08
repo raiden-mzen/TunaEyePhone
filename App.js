@@ -3,17 +3,29 @@
  *
  * Requires:  npx expo install react-native-svg expo-camera
  * Images:    ./assets/images/  (tunaEyeLoadingScreen, PHONEQR, PhoneScanSample, SAMPLETOPDOWN, sashiboCoreFull, tailCutFull .png)
- * app.json plugin: ["expo-camera", { "cameraPermission": "TunaEye uses the camera to scan the kiosk QR code." }]
+ * app.json plugin: ["expo-camera", { "cameraPermission": "TunaEye uses the camera to scan the kiosk QR code and photograph the sample." }]
  *
  * Flow: onboarding (first launch) > weight + grader name > sample > scan the kiosk QR code
- *       > align the sample on the phone camera > take the picture > result (+ manual override) > price > receipt
+ *       > align the sample (illustration) > take the picture (live phone camera) > result (+ manual override) > price > receipt
  *
  * New-user help: blue hero welcome + onboarding, one-line subtitles on every step,
  *                and one-time "Tip n of 6" coach bubbles above the buttons.
+ *
+ * Changes in this version:
+ *  - Receipt (on screen and print) uses the new "TUNAEYE KIOSK" layout and lists EVERY sample (core and/or tail).
+ *  - Fish & grader details screen has more breathing room (top and bottom).
+ *  - Every step now shows a Back button next to Continue in the bottom action bar.
+ *  - "Line it up" shows the SAMPLETOPDOWN illustration only (no live-camera toggle).
+ *  - "Take the photo" always uses the live phone camera (no illustration, no demo toggle).
+ *  - Manual override with two samples lets you pick which sample to override (or set the final grade).
+ *  - An invalid image (not a Sashibo core / tail cut) now pops a red "Invalid image" toast.
+ *  - The "Allow camera" prompt is a properly centered panel (scanner + photo screen), asks automatically,
+ *    and offers "Open settings" if access was blocked.
+ *  - Take photo stays disabled until the camera reports ready.
  */
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import {
-  Animated, Easing, Image, KeyboardAvoidingView, PanResponder, Platform, Pressable, SafeAreaView, ScrollView,
+  Animated, Dimensions, Easing, Image, KeyboardAvoidingView, Linking, PanResponder, Platform, Pressable, SafeAreaView, ScrollView,
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import Svg, {
@@ -22,6 +34,13 @@ import Svg, {
 } from 'react-native-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Font from 'expo-font';
+import * as Print from 'expo-print';
+import NetInfo from '@react-native-community/netinfo';
+import { isSupabaseConfigured } from './src/lib/supabase';
+import { supabaseCloud } from './src/sync/cloud';
+import { persistEvidence, readEvidence } from './src/sync/evidence';
+import { loadStoredRecords, saveStoredRecords } from './src/sync/localStore';
+import { syncRecord } from './src/sync/syncRecord';
 
 let fontsLoaded = false;
 
@@ -96,31 +115,44 @@ const S = {
   schedule: { id: 'PS-DEMO-03', version: 3, rates: { A: 62000, B: 50000, C: 38000 }, effective: 'Oct 1, 2026', validUntil: 'Oct 31, 2026', expired: false, label: 'Demo fixture rates (not an approved schedule)' },
   startup: { state: 'idle', checks: [], fail: null },
   session: null, auth: null, login: null, dialog: null, toast: null, help: false, drawer: false, navDock: false,
-  onboarded: false, onbStep: 0, phoneLinked: false, fixtureCam: false, kioskId: '', scanError: '', lastGrader: '',
+  onboarded: false, onbStep: 0, phoneLinked: false, camReady: false, kioskId: '', scanError: '', lastGrader: '',
   tips: true, coached: {}, barH: 0,
   ui: {
     large: false, batchOpen: false, recFilter: 'all', recSearch: '', recSel: null, reviewGrade: null, reviewReason: '', expertCtx: null,
-    ovGrade: null, ovReason: '', ovAck: false,
+    ovGrade: null, ovReason: '', ovAck: false, ovTarget: null,
   },
   demo: { queue: [], next: 'A', quality: 'ok', printer: 'ok', timeoutOnce: false, cloudFailNext: 0, startupFault: 'none' },
   records: [], counter: 7, lastAck: null, syncing: { active: false, done: 0, total: 0 },
   busy: false, flash: false, print: null, receiptSaved: false, countdown: 30, paused: false, timers: {}, lock: 0,
 };
 let rerender = () => {};
-const render = () => rerender();
+let persistTimer = null;
+const persistSoon = () => { clearTimeout(persistTimer); persistTimer = setTimeout(() => { saveStoredRecords(S.records); }, 400); };
+const render = () => { rerender(); persistSoon(); };
 const clearTimers = () => { Object.values(S.timers).forEach((t) => { clearTimeout(t); clearInterval(t); }); S.timers = {}; };
 const cloudOk = () => S.net === 'online';
 const TS = () => (S.ui.large ? 1.18 : 1);
 
 /* ---------- decision policy ---------- */
+// Per-sample manual overrides (decision.manual with decision.target = 'core' | 'tail') replace that sample's grade.
+function effCaps(s) {
+  const decs = s.decisions || [];
+  return (s.captures || []).map((c) => {
+    const d = decs.slice().reverse().find((x) => x.manual && x.target === c.type && x.grade);
+    return d ? { ...c, label: d.grade, outcome: 'accepted', overridden: true, raw: c } : c;
+  });
+}
 function resolve(s) {
-  const caps = s.captures || [], acc = caps.filter((c) => c.outcome === 'accepted'), dec = (s.decisions || []).slice(-1)[0];
+  const caps = effCaps(s), acc = caps.filter((c) => c.outcome === 'accepted'), dec = (s.decisions || []).filter((d) => !d.target).slice(-1)[0];
   if (dec) return dec.grade
     ? { status: 'final', grade: dec.grade, basis: dec.manual ? 'Manual override' : 'Expert decision', origin: dec.manual ? 'manual' : 'expert' }
     : { status: 'unresolved', reason: 'Expert left this unresolved' };
-  if (caps.length === 1 && acc.length === 1) return { status: 'final', grade: acc[0].label, basis: 'Single sample: ' + TYPES[acc[0].type].name, origin: 'model' };
+  const ov = acc.filter((c) => c.overridden);
+  const note = ov.length ? ' (override on ' + ov.map((c) => TYPES[c.type].short).join(' + ') + ')' : '';
+  const origin = ov.length ? 'manual' : 'model';
+  if (caps.length === 1 && acc.length === 1) return { status: 'final', grade: acc[0].label, basis: 'Single sample: ' + TYPES[acc[0].type].name + note, origin };
   if (caps.length >= 2 && acc.length === 2) {
-    if (acc[0].label === acc[1].label) return { status: 'final', grade: acc[0].label, basis: 'Both samples agree', origin: 'model' };
+    if (acc[0].label === acc[1].label) return { status: 'final', grade: acc[0].label, basis: 'Both samples agree' + note, origin };
     return { status: 'unresolved', conflict: true, reason: 'Samples disagree' };
   }
   if (caps.length && acc.length < caps.length) return { status: 'unresolved', reason: 'A sample result is uncertain or rejected' };
@@ -133,13 +165,21 @@ function priceFor(s) {
   const rate = S.schedule.rates[r.grade];
   return { ok: true, grade: r.grade, basis: r.basis, rate, total: calcTotalCentavos(s.weightTenths, rate), origin: r.origin };
 }
+const capText = (c) => (c.outcome === 'accepted' ? `Grade ${c.label} at ${Math.round(c.score * 100)}%` : c.outcome === 'uncertain' ? `Uncertain, closest ${c.label} at ${Math.round(c.score * 100)}%` : 'Rejected image');
+/** Returns a new decisions list with a manual override added. target: 'all' (final grade) | 'core' | 'tail' */
+function withOverride(decs, grade, target, extra = {}) {
+  const t = target === 'all' || !target ? undefined : target;
+  const kept = decs.filter((d) => !(d.manual && (t === undefined || !d.target || d.target === t)));
+  return [...kept, { id: uid(), grade, manual: true, target: t, ...extra }];
+}
+const screenAfterGrade = (s) => (s.captures.length > 1 ? 'paired' : (s.captures[s.captures.length - 1] || {}).outcome === 'accepted' ? 'result' : 'invalid');
 
 /* ---------- seed data ---------- */
 function seed() {
   const mk = (id, minsAgo, w, caps, final, quote, sync, extra = {}) => ({
     id, uuid: uid(), createdAt: now - minsAgo * 60e3, weightTenths: w, batch: '', site: 'Davao landing center (demo site)', device: 'KIOSK-01 (Demo)', grader: 'Operator 01 (Demo)',
     captures: caps.map((c) => ({ id: uid(), type: c[0], code: c[1], label: c[2], score: c[3], outcome: c[4], inferMs: 700, attempt: 1 })),
-    attempts: 0, decisions: [], weightCorrections: 0, final, quote, revision: 1, sync, offlineOrigin: false,
+    attempts: 0, decisions: [], weightCorrections: 0, final, quote, revision: 1, sync, offlineOrigin: false, demo: true,
     ackAt: sync === 'synced' ? now - minsAgo * 60e3 + 120e3 : null, prints: [], closed: true, ...extra,
   });
   const q = (g, w, ver = 3) => { const rate = S.schedule.rates[g]; return { grade: g, rateC: rate, weightTenths: w, totalC: calcTotalCentavos(w, rate), scheduleVersion: ver, scheduleId: 'PS-DEMO-03', revision: 1, confirmedAt: now, rounding: 'half-up to centavo' }; };
@@ -166,12 +206,15 @@ function go(screen) {
 }
 function newSession() {
   const d = new Date(); const ymd = d.getFullYear() + pad(d.getMonth() + 1, 2) + pad(d.getDate(), 2);
+  const idPrefix = `TE-${ymd}-`; // persisted records survive restarts: never reuse a local id
+  S.counter = Math.max(S.counter, ...S.records.filter((x) => x.id.startsWith(idPrefix)).map((x) => parseInt(x.id.slice(idPrefix.length), 10) + 1 || 0));
   S.session = { id: uid(), recordId: `TE-${ymd}-${pad(S.counter++)}`, weightStr: '', grader: S.lastGrader || '', phone: S.phoneLinked ? 'connected' : 'waiting', weightTenths: 0, batch: '', sampleType: null, sampleTypes: [], captures: [], attempts: [], decisions: [], pending: null, job: null, weightCorrections: 0, editingWeight: false, startedAt: Date.now() };
   S.ui.batchOpen = false; S.print = null;
-}function persist(s) {
+}
+function persist(s) {
   let r = S.records.find((x) => x.id === s.recordId);
   if (!r) { r = { id: s.recordId, uuid: uid(), createdAt: Date.now(), batch: '', site: 'Davao landing center (demo site)', device: 'KIOSK-01 (Demo)', quote: null, revision: 1, sync: 'local', offlineOrigin: false, ackAt: null, prints: [], closed: false }; S.records.unshift(r); }
-  Object.assign(r, { weightTenths: s.weightTenths, grader: s.grader, batch: s.batch, captures: s.captures.map((c) => ({ ...c })), attempts: s.attempts.length, decisions: s.decisions.slice(), weightCorrections: s.weightCorrections, final: resolve(s) });
+  Object.assign(r, { sessionId: s.id, stationId: S.kioskId || null, weightTenths: s.weightTenths, grader: s.grader, batch: s.batch, captures: s.captures.map((c) => ({ ...c })), attempts: s.attempts.length, decisions: s.decisions.slice(), weightCorrections: s.weightCorrections, final: resolve(s) });
   return r;
 }
 function clearPublicSession() { S.session = null; S.print = null; S.ui.reviewGrade = null; S.ui.reviewReason = ''; S.ui.expertCtx = null; }
@@ -182,28 +225,43 @@ function abandonSession() {
 }
 function finishToWelcome() { clearPublicSession(); S.auth = null; go('welcome'); }
 
-/* ---------- sync (simulated) ---------- */
-function enqueue(r) { r.sync = 'pending'; r.offlineOrigin = !cloudOk(); r.stage = ''; if (cloudOk()) uploadOne(r); }
+/* ---------- sync (Supabase, same project as the kiosk; connectivity-triggered, no Realtime) ---------- */
+const needsSync = (r) => !r.demo && r.closed && (r.sync === 'pending' || r.sync === 'failed');
+function enqueue(r) {
+  r.syncVersion = (r.syncVersion || 0) + 1; r.offlineOrigin = !cloudOk();
+  if (r.sync === 'syncing') return; // the running sync notices syncVersion changed and runs again
+  r.sync = 'pending'; r.stage = ''; r.lastSyncError = '';
+  if (cloudOk()) uploadOne(r);
+}
 async function uploadOne(r) {
-  if (r.sync === 'uploading') return false;
-  r.sync = 'uploading'; r.stage = 'Staging image'; render();
-  await sleep(800); r.stage = 'Sending metadata'; render();
-  await sleep(700);
-  if (S.demo.cloudFailNext > 0) { S.demo.cloudFailNext--; r.sync = 'failed'; r.stage = 'Image staged, metadata not acknowledged'; render(); return false; }
-  if (!cloudOk()) { r.sync = 'failed'; r.stage = 'Connection lost during upload'; render(); return false; }
+  if (r.sync === 'syncing' || r.demo) return false;
+  if (!isSupabaseConfigured()) { r.sync = 'pending'; r.stage = 'Cloud not configured'; render(); return false; }
+  const version = r.syncVersion || 0;
+  r.sync = 'syncing'; r.stage = 'Signing in'; r.lastSyncError = ''; render();
+  try {
+    if (S.demo.cloudFailNext > 0) { S.demo.cloudFailNext--; throw new Error('Simulated cloud failure (demo control)'); }
+    await syncRecord({ cloud: supabaseCloud, readImage: readEvidence }, r, {
+      onStage: (stage) => { r.stage = stage; render(); },
+      onImageUploaded: (key, path) => { r.remote = { ...(r.remote || {}), [key]: { imagePath: path } }; persistSoon(); },
+    });
+  } catch (e) {
+    r.sync = 'failed'; r.stage = ''; r.lastSyncError = (e && e.message) || 'Unknown synchronization error'; render(); return false;
+  }
+  if ((r.syncVersion || 0) !== version) { r.sync = 'pending'; r.stage = ''; return uploadOne(r); } // changed mid-sync (e.g. expert decision)
   r.sync = 'synced'; r.stage = ''; r.ackAt = Date.now(); S.lastAck = r.ackAt; render(); return true;
 }
 async function syncBatch(filter) {
   if (!cloudOk() || S.syncing.active) return;
   const items = S.records.filter(filter);
+  if (!items.length) return;
   S.syncing = { active: true, done: 0, total: items.length }; render();
   for (const r of items) { await uploadOne(r); S.syncing.done++; render(); }
   S.syncing.active = false; render();
 }
-const syncNow = () => syncBatch((r) => r.sync === 'pending');
-const retryFailed = () => syncBatch((r) => r.sync === 'failed');
-const counts = () => ({ pending: S.records.filter((r) => r.sync === 'pending').length, uploading: S.records.filter((r) => r.sync === 'uploading').length, failed: S.records.filter((r) => r.sync === 'failed').length, synced: S.records.filter((r) => r.sync === 'synced').length });
-const syncLabel = (r) => ({ local: 'Saved on device • Not yet closed', pending: 'Saved on device • Upload pending', uploading: 'Uploading…', synced: 'Uploaded', failed: 'Upload failed • Will retry' }[r.sync]);
+const syncNow = () => syncBatch(needsSync);
+const retryFailed = () => syncBatch((r) => needsSync(r) && r.sync === 'failed');
+const counts = () => ({ pending: S.records.filter((r) => r.sync === 'pending').length, syncing: S.records.filter((r) => r.sync === 'syncing').length, failed: S.records.filter((r) => r.sync === 'failed').length, synced: S.records.filter((r) => r.sync === 'synced').length });
+const syncLabel = (r) => ({ local: 'Saved on device • Not yet closed', pending: 'Saved on device • Upload pending', syncing: 'Uploading…', synced: 'Uploaded', failed: 'Upload failed • Will retry' }[r.sync]);
 
 /* ---------- startup ---------- */
 async function runStartup() {
@@ -215,7 +273,7 @@ async function runStartup() {
     ['Storage', { ok: true, msg: 'Writable' }],
     ['Shift', { ok: S.shift.open, msg: S.shift.open ? 'Open' : 'Closed', soft: true }],
     ['Printer', { ok: true, msg: 'Not confirmed in demo', soft: true, warn: true }],
-    ['Cloud', { ok: cloudOk(), msg: cloudOk() ? 'Reachable' : 'Offline • saving on device', soft: true, warn: !cloudOk() }],
+    ['Cloud', { ok: cloudOk() && isSupabaseConfigured(), msg: !isSupabaseConfigured() ? 'Not configured • saving on device' : cloudOk() ? 'Reachable' : 'Offline • saving on device', soft: true, warn: !cloudOk() || !isSupabaseConfigured() }],
   ];
   for (const [name, res] of list) {
     await sleep(380); if (S.startup.tok !== tok || S.screen !== 'startup') return;
@@ -248,13 +306,13 @@ const nextCode = () => (S.demo.queue.length ? S.demo.queue.shift() : S.demo.next
 async function doCapture() {
   if (S.busy) return; const s = S.session; if (!s || !s.sampleType) return;
   if (!S.shift.open) { toast('Shift is closed. Capture is blocked.', 'err'); return; }
+  if (!camRef || !S.camReady) { toast('The camera is not ready yet. Allow camera access and try again.', 'err'); return; }
   S.busy = true; S.flash = true; render();
   const tok = s.id; let uri = null;
-  if (camRef && !S.fixtureCam) {
-    try { const ph = await camRef.takePictureAsync({ quality: 0.7, skipProcessing: true }); uri = ph && ph.uri; }
-    catch (e) { S.busy = false; S.flash = false; toast('The phone could not take the picture. Try again.', 'err'); return; }
-    await sleep(150);
-  } else await sleep(450);
+  try { const ph = await camRef.takePictureAsync({ quality: 0.7, skipProcessing: true }); uri = ph && ph.uri; }
+  catch (e) { uri = null; }
+  if (!uri) { S.busy = false; S.flash = false; toast('The phone could not take the picture. Try again.', 'err'); return; }
+  await sleep(150);
   S.busy = false; S.flash = false;
   if (!S.session || S.session.id !== tok || S.screen !== 'camera') { render(); return; }
   s.pending = { id: uid(), type: s.sampleType, code: nextCode(), quality: S.demo.quality, ts: Date.now(), uri };
@@ -272,24 +330,92 @@ async function runAnalysis() {
   const p = s.pending, m = MAP[p.code];
   const prior = s.captures.findIndex((c) => c.type === p.type);
   const attempt = s.attempts.filter((a) => a.type === p.type).length + 1;
-  const cap = { id: p.id, type: p.type, code: p.code, label: m.label, score: m.score, outcome: m.outcome, inferMs: 640 + Math.floor(Math.random() * 280), attempt, ts: p.ts, uri: p.uri };
+  const keptUri = await persistEvidence(p.uri, p.id); if (!alive()) return;
+  const cap = { id: p.id, type: p.type, code: p.code, label: m.label, score: m.score, outcome: m.outcome, inferMs: 640 + Math.floor(Math.random() * 280), attempt, ts: p.ts, uri: keptUri };
   if (prior >= 0) s.attempts.push(s.captures.splice(prior, 1)[0]);
   s.captures.push(cap); s.pending = null; s.job = null;
   persist(s);
   go(cap.outcome === 'accepted' ? (s.captures.length >= 2 ? 'paired' : 'result') : 'invalid');
+  // Not a Sashibo core or tail cut: the UI stays the same, but a toast pops up.
+  if (cap.outcome === 'invalid') toast('Invalid image', 'err');
 }
 
 /* ---------- print / countdown / toast / dialog ---------- */
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---- shared receipt helpers ---- */
+const fmtReceiptDate = (ts) => { const d = manila(ts); return `${MON[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}, ${clock12(d)}`; };
+// One line per sample (core and/or tail), using overrides where they exist.
+const sampleLines = (r) => effCaps(r).map((c) => ({
+  name: `${TYPES[c.type].name} (Fish 1)`,
+  grade: c.outcome === 'accepted' ? c.label : '—',
+  note: c.overridden ? `Manual override (model: ${capText(c.raw)})` : c.outcome === 'accepted' ? `Confidence: ${Math.round(c.score * 100)}%` : capText(c),
+}));
+// Deterministic pseudo-barcode from the record id.
+function barcodeBars(id) {
+  const seq = ('7' + id).split('').map((ch) => ch.charCodeAt(0)); const bars = []; let x = 0;
+  for (let i = 0; i < 52; i++) { const v = seq[i % seq.length] + i * 7; const w = 1 + (v % 3); bars.push({ x, w }); x += w + 1 + ((v >> 2) % 2); }
+  return { bars, width: x };
+}
+
+function receiptHtml(r) {
+  const q = r.quote, lines = sampleLines(r), bc = barcodeBars(r.id);
+  const items = lines.map((l) => `
+    <div class="row"><span class="b">${esc(l.name)}</span><span class="b">Grade ${esc(l.grade)}</span></div>
+    <div class="it">${esc(l.note)}</div>`).join('');
+  const bars = bc.bars.map((b) => `<rect x="${b.x}" y="0" width="${b.w}" height="40" fill="#4a4a46"/>`).join('');
+  return `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0" /><style>
+    body{font-family:'Courier New',monospace;color:#1a1a18;margin:0;padding:24px;display:flex;justify-content:center;background:#fff}
+    .paper{width:320px;background:#FBFAF6;padding:24px 28px;box-sizing:border-box}
+    .c{text-align:center}.t{font-size:22px;font-weight:700;letter-spacing:1px;margin-top:10px}
+    .sub{font-size:13px;color:#6b6b66;margin:4px 0 14px}
+    .d{border-top:1px dashed #b5b5ae;margin:14px 0}.s{border-top:1px solid #d5d5ce;margin:14px 0 0}
+    .row{display:flex;justify-content:space-between;gap:8px;font-size:14px;margin:7px 0}
+    .k{color:#6b6b66}.b{font-weight:700}.h{font-size:12px;font-weight:700;color:#6b6b66}
+    .it{font-size:12px;font-style:italic;color:#6b6b66;margin:-2px 0 8px}
+    .tot{font-size:20px;font-weight:700;margin:12px 0}.f{font-size:12px;color:#9b9b95}
+  </style></head><body><div class="paper">
+    <div class="c t">TUNAEYE KIOSK</div><div class="c sub">Certified Quality Inspection</div>
+    <div class="d"></div>
+    <div class="row"><span class="k">ORDER NO:</span><span class="b">#${esc(r.id)}</span></div>
+    <div class="row"><span class="k">DATE:</span><span>${esc(fmtReceiptDate(q.confirmedAt))}</span></div>
+    <div class="row"><span class="k">INSPECTOR:</span><span>${esc(r.grader || '—')}</span></div>
+    <div class="d"></div>
+    <div class="row h"><span>ITEM</span><span>GRADE</span></div>
+    ${items}
+    <div class="row"><span class="k">Weight (manual)</span><span class="b">${esc(fmtKg(q.weightTenths))}</span></div>
+    <div class="row"><span class="k">Rate</span><span>${esc(fmtMoney(q.rateC))}/kg</span></div>
+    <div class="row"><span class="k">Estimate</span><span class="b">${esc(fmtMoney(q.totalC))}</span></div>
+    <div class="s"></div>
+    <div class="row tot"><span>TOTAL:</span><span>Grade ${esc(r.final.grade)}</span></div>
+    <div class="it">${esc(r.final.basis)}</div>
+    <div class="d"></div>
+    <div class="c"><svg width="240" height="56" viewBox="0 0 ${bc.width} 40" preserveAspectRatio="none">${bars}</svg>
+    <div class="f" style="margin-top:6px">* ${esc(r.id)} *</div></div>
+    <div class="c" style="margin-top:14px;font-size:13px">Thank you for using TunaEye Kiosk!</div>
+    <div class="c f" style="margin-top:6px">Decision-support estimate. Not a payment record.</div>
+  </div></body></html>`;
+}
+/** Opens the system print dialog (Android print service / iOS AirPrint). Resolves { ok } or { cancelled } or { error }. */
+async function printReceipt(r) {
+  try { await Print.printAsync({ html: receiptHtml(r) }); return { ok: true }; }
+  catch (e) {
+    const msg = (e && e.message) || 'Printing failed.';
+    return /cancel|did not complete|dismiss/i.test(msg) ? { cancelled: true } : { error: msg };
+  }
+}
 async function doPrint() {
   const s = S.session; if (!s || !s.quote) return;
   if (S.print && S.print.state === 'sending') return;
   S.print = { state: 'sending' }; render(); const tok = s.id;
-  await sleep(1000); if (!S.session || S.session.id !== tok || S.screen !== 'receipt') return;
   const r = S.records.find((x) => x.id === s.recordId);
-  if (S.demo.printer !== 'ok') {
-    const msg = S.demo.printer === 'paper' ? 'Paper out. Load a roll and try again.' : 'The printer did not respond.';
-    S.demo.printer = 'ok'; S.print = { state: 'error', msg }; r.prints.push({ ts: Date.now(), kind: 'Original', result: 'Failed: ' + msg }); render(); return;
-  }
+  let res;
+  if (S.demo.printer !== 'ok') { // demo fault injection still works
+    res = { error: S.demo.printer === 'paper' ? 'Paper out. Load a roll and try again.' : 'The printer did not respond.' }; S.demo.printer = 'ok';
+  } else res = await printReceipt(r);
+  if (!S.session || S.session.id !== tok || S.screen !== 'receipt') return;
+  if (res.cancelled) { S.print = null; render(); return; }
+  if (res.error) { S.print = { state: 'error', msg: res.error }; r.prints.push({ ts: Date.now(), kind: 'Original', result: 'Failed: ' + res.error }); render(); return; }
   r.prints.push({ ts: Date.now(), kind: r.prints.some((p) => p.result === 'Receipt sent') ? 'Copy' : 'Original', result: 'Receipt sent' });
   S.print = { state: 'sent' }; render();
 }
@@ -309,7 +435,7 @@ function startCountdown() {
   S.countdown = 30; S.paused = false;
   S.timers.cd = setInterval(() => { S.countdown--; if (S.countdown <= 0) { finishToWelcome(); return; } render(); }, 1000);
 }
-function toast(msg, kind) { S.toast = { msg, kind }; render(); clearTimeout(S.timers.toast); S.timers.toast = setTimeout(() => { S.toast = null; render(); }, 2600); }
+function toast(msg, kind) { S.toast = { msg, kind }; render(); clearTimeout(S.timers.toast); S.timers.toast = setTimeout(() => { S.toast = null; render(); }, 2800); }
 function ask(title, body, acts) { S.dialog = { title, body, acts }; render(); }
 
 /* ---------- phone pairing: the phone scans the kiosk's QR code ---------- */
@@ -342,12 +468,11 @@ const A = {
   go(a) { S.dialog = null; go(a); },
   goSync() { go('sync'); },
   pairNext() { const s = S.session; if (s.phone !== 'connected') return; go('align'); },
-  useFixtureCam() { S.fixtureCam = true; render(); },
   simPhone() { connectPhone('KIOSK-01'); },
-  skipDemo() { S.fixtureCam = true; connectPhone('KIOSK-01'); },
-  livecam() { S.fixtureCam = false; render(); },
+  skipDemo() { connectPhone('KIOSK-01'); },
   repair() { const s = S.session; S.phoneLinked = false; s.phone = 'waiting'; S.scanError = ''; render(); },
   allowCamera() { askCamera(); },
+  openSettings() { Linking.openSettings().catch(() => {}); },
   onbNext() { if (S.onbStep < ONB.length - 1) { S.onbStep++; render(); } else A.onbDone(); },
   onbBack() { if (S.onbStep > 0) { S.onbStep--; render(); } },
   onbSkip() { A.onbDone(); },
@@ -391,8 +516,8 @@ const A = {
   retake() { const s = S.session; s.pending = null; s.job = null; go('camera'); },
   useImage() { runAnalysis(); },
   retryAnalysis() { runAnalysis(); },
-  retakeSaved() { const s = S.session; s.pending = null; s.decisions = s.decisions.filter((d) => !d.manual); const c = s.captures[s.captures.length - 1]; s.sampleType = c.type; go('camera'); },
-  retakeType(t) { const s = S.session; s.decisions = s.decisions.filter((d) => !d.manual); s.sampleType = t; go('camera'); },
+  retakeSaved() { const s = S.session; s.pending = null; const c = s.captures[s.captures.length - 1]; s.decisions = s.decisions.filter((d) => !(d.manual && (!d.target || d.target === c.type))); s.sampleType = c.type; go('camera'); },
+  retakeType(t) { const s = S.session; s.decisions = s.decisions.filter((d) => !(d.manual && (!d.target || d.target === t))); s.sampleType = t; go('camera'); },
   addOther() { const s = S.session; s.sampleType = other(s.captures[s.captures.length - 1].type); go('sample'); },
   discardSample() { const s = S.session; const c = s.captures.pop(); s.attempts.push(c); persist(s); go(s.captures.length > 1 ? 'paired' : 'result'); },
   toPrice() { persist(S.session); go('price'); },
@@ -416,20 +541,27 @@ const A = {
   another() { clearPublicSession(); S.auth = null; newSession(); go('weight'); },
 
   /* ----- manual override ----- */
-  override() { const s = S.session; S.ui.ovGrade = null; S.ui.ovReason = ''; S.ui.ovAck = false; s.ovFrom = S.screen; go('override'); },
+  override() {
+    const s = S.session; S.ui.ovGrade = null; S.ui.ovReason = ''; S.ui.ovAck = false;
+    // With two samples the grader picks which one to override (pre-select a sample that is not accepted).
+    const bad = s.captures.find((c) => c.outcome !== 'accepted');
+    S.ui.ovTarget = s.captures.length > 1 ? (bad ? bad.type : null) : 'all';
+    s.ovFrom = S.screen; go('override');
+  },
   ovGrade(g) { S.ui.ovGrade = g; render(); },
+  ovTarget(t) { S.ui.ovTarget = t; render(); },
   ovReasonPick(t) { S.ui.ovReason = t; render(); },
   ovAck() { S.ui.ovAck = !S.ui.ovAck; render(); },
   cancelOverride() { go(S.session.ovFrom || 'result'); },
   applyOverride() {
     const s = S.session, g = S.ui.ovGrade, reason = S.ui.ovReason.trim();
-    if (!g || reason.length < 5 || !S.ui.ovAck) return;
-    s.decisions = s.decisions.filter((d) => !d.manual);
-    s.decisions.push({ id: uid(), grade: g, reason, actor: s.grader || 'Grader', manual: true, ts: Date.now(), expectedRevision: 1 });
+    const tg = s.captures.length > 1 ? S.ui.ovTarget : 'all';
+    if (!g || !tg || reason.length < 5 || !S.ui.ovAck) return;
+    s.decisions = withOverride(s.decisions, g, tg, { reason, actor: s.grader || 'Grader', ts: Date.now(), expectedRevision: 1 });
     persist(s);
     const last = s.captures[s.captures.length - 1];
     go(s.captures.length > 1 ? 'paired' : last.outcome === 'accepted' ? 'result' : 'price');
-    toast('Grade set to ' + g + ' by manual override.');
+    toast(tg === 'all' ? 'Grade set to ' + g + ' by manual override.' : TYPES[tg].name + ' set to ' + g + ' by manual override.');
   },
   clearOverride() {
     const s = S.session; s.decisions = s.decisions.filter((d) => !d.manual); persist(s);
@@ -454,13 +586,13 @@ const A = {
   recFilter(f) { S.ui.recFilter = f; render(); },
   openRec(id) { S.ui.recSel = id; render(); },
   closeRec() { S.ui.recSel = null; render(); },
-  reprintRec(id) { const r = S.records.find((x) => x.id === id); r.prints.push({ ts: Date.now(), kind: 'Copy', result: 'Receipt sent' }); toast('Copy receipt sent (demo). Marked as a copy on the record.'); },
+  async reprintRec(id) { const r = S.records.find((x) => x.id === id); if (!r || !r.quote) { toast('No receipt to print for this record.', 'err'); return; } const res = await printReceipt(r); if (res.cancelled) return; if (res.error) { toast(res.error, 'err'); return; } r.prints.push({ ts: Date.now(), kind: 'Copy', result: 'Receipt sent' }); toast('Copy receipt sent to the print dialog. Marked as a copy on the record.'); },
   reviewRecord(id) { S.ui.expertCtx = { kind: 'record', id }; S.ui.reviewGrade = null; S.ui.reviewReason = ''; go('expert'); },
   revGrade(g) { S.ui.reviewGrade = g; render(); },
   cancelReview() {
     const ctx = S.ui.expertCtx; S.auth = null; S.ui.reviewGrade = null; S.ui.reviewReason = ''; S.ui.expertCtx = null;
     if (ctx && ctx.kind === 'record') go('welcome');
-    else go(S.session ? (S.session.captures.length > 1 ? 'paired' : (S.session.captures[S.session.captures.length - 1] || {}).outcome === 'accepted' ? 'result' : 'invalid') : 'welcome');
+    else go(S.session ? screenAfterGrade(S.session) : 'welcome');
   },
   applyReview() { ask('Add this decision?', 'Your decision and reason are added to the record. The original model output stays unchanged. You will be signed out.', [{ label: 'Go back', act: 'closeDialog' }, { label: 'Apply decision', act: 'doApply', kind: 'primary' }]); },
   doApply() {
@@ -476,8 +608,8 @@ const A = {
     const r = resolve(s);
     go(s.captures.length >= 2 ? 'paired' : r.status === 'final' ? 'price' : 'invalid');
   },
-  syncNow() { syncBatch((r) => r.sync === 'pending'); },
-  retryFailed() { syncBatch((r) => r.sync === 'failed'); },
+  syncNow() { syncNow(); },
+  retryFailed() { retryFailed(); },
   textsize(v) { S.ui.large = v === 'l'; render(); },
   test(n) { toast(n + ' test passed (demo only, no hardware attached).'); },
 };
@@ -757,12 +889,21 @@ function Header({ idx }) {
   );
 }
 
+/**
+ * Screen shell. The bottom action bar always shows: [extra actions row] + [Back] [Continue].
+ * Back is the first element in `left` whose icon is 'back'. Everything in `right` is shown in the bar
+ * (primary buttons beside Back, other buttons in a row above). Swipe the handle up to see the full dock.
+ */
 function Shell({ idx = 0, left = [], right = [], children }) {
   const items = [...left, ...right].filter(Boolean);
   const isP = (e) => (e.props.kind || '').includes('primary');
   const ordered = [...items.filter((e) => e.props.text), ...items.filter((e) => !e.props.text && isP(e)), ...items.filter((e) => !e.props.text && !isP(e))];
-  const primaryItems = right.filter(Boolean);
+  const backEl = left.find((e) => e && e.props && e.props.icon === 'back');
+  const rightItems = right.filter(Boolean);
+  const prim = rightItems.filter(isP), sec = rightItems.filter((e) => !isP(e));
+  const hasBar = !!(backEl || rightItems.length);
   const navGesture = useRef(null);
+  const [barH, setBarH] = useState(0);
 
   if (!navGesture.current) {
     navGesture.current = PanResponder.create({
@@ -785,7 +926,7 @@ function Shell({ idx = 0, left = [], right = [], children }) {
           flexGrow: 1,
           paddingHorizontal: 16,
           // Leave room for the always-visible action bar.
-          paddingBottom: primaryItems.length && !S.navDock ? 92 : 16,
+          paddingBottom: hasBar && !S.navDock ? (barH || 92) + 22 + 16 : 16,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -793,17 +934,18 @@ function Shell({ idx = 0, left = [], right = [], children }) {
         {children}
       </ScrollView>
 
-      {/* Primary screen actions stay visible. The swipe-up dock is still separate. */}
-      {!S.navDock && primaryItems.length ? (
+      {/* Back + Continue stay visible. The swipe-up dock is still separate. */}
+      {!S.navDock && hasBar ? (
         <View
+          onLayout={(e) => { const h = Math.ceil(e.nativeEvent.layout.height); if (h !== barH) setBarH(h); }}
           style={{
             position: 'absolute',
             left: 0,
             right: 0,
             bottom: 22,
             paddingHorizontal: 16,
-            paddingTop: 8,
-            paddingBottom: 8,
+            paddingTop: 10,
+            paddingBottom: 10,
             backgroundColor: 'rgba(246,248,252,0.97)',
             borderTopWidth: 1,
             borderTopColor: C.border,
@@ -814,12 +956,16 @@ function Shell({ idx = 0, left = [], right = [], children }) {
             elevation: 8,
           }}
         >
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-            {primaryItems.map((e, i) => React.cloneElement(e, {
-              key: i,
-              bar: true,
-              style: [{ minHeight: 54 }, e.props.style],
-            }))}
+          <View style={{ gap: 10 }}>
+            {sec.length ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                {sec.map((e, i) => React.cloneElement(e, { key: 's' + i, bar: true, style: [{ minHeight: 48 }, e.props.style] }))}
+              </View>
+            ) : null}
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              {backEl ? React.cloneElement(backEl, { key: 'back', kind: '', style: [{ minHeight: 54, minWidth: 112, flex: prim.length ? 0 : 1 }] }) : null}
+              {prim.map((e, i) => React.cloneElement(e, { key: 'p' + i, style: [{ minHeight: 54, flex: 1 }, e.props.style] }))}
+            </View>
           </View>
         </View>
       ) : null}
@@ -868,7 +1014,7 @@ const COACH = {
   weight: 'Type your name and the fish weight from your scale. Use kilograms with one decimal.',
   sample: 'Tap the cut you placed in the chamber. You can add the other cut afterward.',
   pair: 'Point your phone at the QR code on the kiosk. It connects by itself.',
-  align: 'Move the phone until the sample sits inside the dashed outline.',
+  align: 'Place the sample in the tray like the picture shows, then tap Looks good.',
   camera: 'Hold still, then tap Take photo. You can retake it if it looks blurry.',
   result: 'This is the suggested grade and price. If it looks wrong, tap Override grade.',
 };
@@ -936,7 +1082,7 @@ screens.startup = () => {
 };
 
 screens.welcome = () => {
-  const c = counts(); const pend = c.pending + c.failed + c.uploading; const open = S.shift.open;
+  const c = counts(); const pend = c.pending + c.failed + c.syncing; const open = S.shift.open;
   const dayKey = (t) => manila(t).toISOString().slice(0, 10);
   const todayN = S.records.filter((r) => dayKey(r.createdAt) === dayKey(Date.now())).length;
   const hr = manila(Date.now()).getUTCHours();
@@ -987,27 +1133,29 @@ screens.weight = () => {
   return (
     <Shell idx={1} left={[backBtn(editing ? 'go' : 'cancelSession', editing ? (s.editFrom || 'price') : ''), helpBtn()]}
       right={[B(editing ? 'Update price' : 'Continue', 'weightNext', '', 'primary', !chk.ok || s.grader.trim().length < 2, 'arrow')]}>
-      <View style={[BODY, { gap: 14, paddingBottom: 14 }]}>
-        <View style={{ alignItems: 'center', gap: 6 }}>
-          <Txt k="title" style={{ fontSize: 34, textAlign: 'center' }}>Fish & grader details</Txt>
+      <View style={[BODY, { gap: 22, paddingTop: 20, paddingBottom: 36 }]}>
+        <View style={{ alignItems: 'center', gap: 10, paddingBottom: 4 }}>
+          <Txt k="title" style={{ fontSize: 34, lineHeight: 40, textAlign: 'center' }}>Fish & grader details</Txt>
           <Sub>Keep the fish information and the person grading it clearly separated.</Sub>
         </View>
 
-        <Card lift style={{ gap: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Card lift style={{ gap: 14, paddingVertical: 22, paddingHorizontal: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 4 }}>
             <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#E4ECFC', alignItems: 'center', justifyContent: 'center' }}>
               <Icon n="pulse" s={24} c={C.primary} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, gap: 2 }}>
               <Txt k="h2">Fish details</Txt>
               <Txt k="sub">Information attached to this grading record.</Txt>
             </View>
           </View>
-          <KV l="Species" r="Yellowfin tuna" />
-          <KV l="Record" r={s.recordId} />
-          <KV l="Weight" r={chk.ok ? fmtKg(chk.t) : 'Enter weight below'} />
-          <KV l="Selected sample" r={selected} />
-          <View style={{ gap: 6 }}>
+          <View>
+            <KV l="Species" r="Yellowfin tuna" />
+            <KV l="Record" r={s.recordId} />
+            <KV l="Weight" r={chk.ok ? fmtKg(chk.t) : 'Enter weight below'} />
+            <KV l="Selected sample" r={selected} last />
+          </View>
+          <View style={{ gap: 10, marginTop: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Txt k="label">Fish weight</Txt>
               <Txt k="det" style={{ color: C.primary, fontWeight: '700' }}>Required</Txt>
@@ -1024,12 +1172,12 @@ screens.weight = () => {
           </View>
         </Card>
 
-        <Card lift style={{ gap: 10, borderColor: '#C9D9F7', backgroundColor: '#F8FBFF' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Card lift style={{ gap: 16, paddingVertical: 22, paddingHorizontal: 20, borderColor: '#C9D9F7', backgroundColor: '#F8FBFF' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
               <Icon n="edit" s={27} c="#fff" />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Txt k="label">GRADER</Txt>
                 <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#E8F0FF' }}><Text style={{ fontSize: 11, fontWeight: '800', color: C.primary }}>REQUIRED</Text></View>
@@ -1112,10 +1260,33 @@ function ScanArt({ size = 190 }) {
   return <Image source={IMG.qr} style={{ width: size, height: size }} resizeMode="contain" />;
 }
 
+/* ---------- camera permission panel (used by the QR scanner and the photo screen) ---------- */
+function CameraPermission({ dark, msg }) {
+  const [perm] = useCameraPermissions();
+  const blocked = !!perm && !perm.granted && !perm.canAskAgain;
+  const fg = dark ? '#FFFFFF' : C.navy, sub = dark ? '#C8D4E3' : C.text2;
+  return (
+    <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 22, paddingHorizontal: 22 }}>
+      <View style={{ width: 58, height: 58, borderRadius: 29, backgroundColor: dark ? 'rgba(255,255,255,0.14)' : '#E4ECFC', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon n="camera" s={30} c={dark ? '#fff' : C.primary} />
+      </View>
+      <Text style={{ fontSize: 20 * TS(), fontWeight: '800', color: fg, textAlign: 'center' }}>Allow camera access</Text>
+      <Text style={{ fontSize: 14.5 * TS(), lineHeight: 20 * TS(), color: sub, textAlign: 'center', maxWidth: 280 }}>
+        {blocked ? 'Camera access is turned off. Open your phone settings and allow the camera for TunaEye.' : msg}
+      </Text>
+      <View style={{ alignSelf: 'stretch', alignItems: 'center', marginTop: 4 }}>
+        {B(blocked ? 'Open settings' : 'Allow camera', blocked ? 'openSettings' : 'allowCamera', '', 'primary', false, '', { alignSelf: 'stretch', maxWidth: 300, minHeight: 52 })}
+      </View>
+    </View>
+  );
+}
+
 function Scanner() {
   const [perm, requestPerm] = useCameraPermissions();
   const done = useRef(false), lastBad = useRef('');
   askCamera = requestPerm;
+  // Ask for access automatically the first time the scanner opens.
+  useEffect(() => { if (perm && !perm.granted && perm.canAskAgain) requestPerm(); }, [perm ? perm.granted : null, perm ? perm.canAskAgain : null]);
   const onScan = (e) => {
     if (done.current) return;
     const id = parseKioskCode(e && e.data);
@@ -1129,11 +1300,8 @@ function Scanner() {
   if (!perm) return <View style={box}><Spin light /></View>;
   if (!perm.granted) {
     return (
-      <Card lift style={{ alignItems: 'center', gap: 14, width: '100%' }}>
-        <Icon n="camera" s={44} c={C.primary} />
-        <Txt k="h2" style={{ textAlign: 'center' }}>Allow camera access</Txt>
-        <Txt k="sub" style={{ textAlign: 'center' }}>TunaEye needs your phone camera to scan the QR code on the kiosk.</Txt>
-        {B('Allow camera', 'allowCamera', '', 'primary')}
+      <Card lift style={{ width: '100%', padding: 4 }}>
+        <CameraPermission msg="TunaEye needs your phone camera to scan the QR code on the kiosk." />
       </Card>
     );
   }
@@ -1150,7 +1318,7 @@ screens.pair = () => {
   const s = S.session, ok = s.phone === 'connected';
   return (
     <Shell idx={3} left={[backBtn('go', 'sample'), helpBtn()]} right={[B('Continue', 'pairNext', '', 'primary', !ok, 'arrow')]}>
-      <View style={[BODY, { gap: 10, alignItems: 'center', paddingBottom: 8 }]}>
+      <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
         <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Scan the kiosk</Txt>
         <Sub>Point your phone at the QR code on the kiosk screen.</Sub>
         {ok ? (
@@ -1251,31 +1419,45 @@ screens.onboarding = () => {
   );
 };
 
-/* ---------- live phone camera (steps 4 and 5) ---------- */
-function PhoneCam({ type, blur }) {
+/* ---------- live phone camera (step 5: take the photo) ---------- */
+function PhoneCam({ type }) {
   const [perm, requestPerm] = useCameraPermissions();
   const [err, setErr] = useState(false);
+  const [tries, setTries] = useState(0);
   askCamera = requestPerm;
-  if (S.fixtureCam || err) { camRef = null; return <TunaImg tone="A" type={type} blur={blur} />; }
+  // Ask for access automatically when the screen opens.
+  useEffect(() => { if (perm && !perm.granted && perm.canAskAgain) requestPerm(); }, [perm ? perm.granted : null, perm ? perm.canAskAgain : null]);
+  useEffect(() => () => { S.camReady = false; camRef = null; }, []);
   if (!perm) return <Spin light />;
-  if (!perm.granted) {
+  if (!perm.granted) return <CameraPermission dark msg="Your phone camera shows and photographs the sample." />;
+  if (err) {
     return (
-      <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, backgroundColor: '#0F1B2B' }]}>
-        <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Allow camera access</Text>
-        <Text style={{ color: '#C8D4E3', fontSize: 14, textAlign: 'center' }}>Your phone camera shows and photographs the sample.</Text>
-        <View style={{ flexDirection: 'row', gap: 10 }}>{B('Allow camera', 'allowCamera', '', 'primary small', false, '', { flex: 0 })}{B('Use demo image', 'useFixtureCam', '', 'small', false, '', { flex: 0 })}</View>
+      <View style={{ width: '100%', alignItems: 'center', gap: 12, padding: 22 }}>
+        <Icon n="warn" s={40} c="#FFD98A" />
+        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' }}>The camera did not start</Text>
+        <Text style={{ color: '#C8D4E3', fontSize: 14, textAlign: 'center' }}>Close other apps that use the camera, then try again.</Text>
+        <Pressable onPress={() => { setErr(false); setTries((n) => n + 1); }} style={{ minHeight: 48, paddingHorizontal: 28, borderRadius: 999, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Try again</Text>
+        </Pressable>
       </View>
     );
   }
-  return <CameraView ref={(r) => { camRef = r; }} style={StyleSheet.absoluteFill} facing="back" onMountError={() => setErr(true)} />;
+  return (
+    <>
+      <CameraView
+        key={tries} ref={(r) => { camRef = r; }} style={StyleSheet.absoluteFill} facing="back"
+        onCameraReady={() => { S.camReady = true; render(); }} onMountError={() => { S.camReady = false; setErr(true); }}
+      />
+      <View pointerEvents="none" style={{ position: 'absolute', top: '12%', bottom: '12%', left: '14%', right: '14%', borderWidth: 4, borderStyle: 'dashed', borderColor: 'rgba(93,217,245,0.95)', borderRadius: 36 }} />
+      {chip(TYPES[type].name, '', '', { position: 'absolute', left: 20, top: 20, backgroundColor: '#fff' })}
+      {chip('Live · Phone camera', 'info', '', { position: 'absolute', right: 20, top: 20 })}
+      {S.flash && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#fff', opacity: 0.7 }]} />}
+    </>
+  );
 }
-const camView = (t, blur) => (
-  <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>
-    <PhoneCam type={t} blur={blur} />
-    <View pointerEvents="none" style={{ position: 'absolute', top: '12%', bottom: '12%', left: '14%', right: '14%', borderWidth: 4, borderStyle: 'dashed', borderColor: 'rgba(93,217,245,0.95)', borderRadius: 36 }} />
-    {chip(TYPES[t].name, '', '', { position: 'absolute', left: 20, top: 20, backgroundColor: '#fff' })}
-    {chip(S.fixtureCam ? 'Demo image' : 'Live · Phone camera', 'info', '', { position: 'absolute', right: 20, top: 20 })}
-    {S.flash && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#fff', opacity: 0.7 }]} />}
+const camView = (t) => (
+  <ImgFrame style={{ width: '100%', aspectRatio: 1 }}>
+    <PhoneCam type={t} />
   </ImgFrame>
 );
 
@@ -1298,33 +1480,37 @@ function DemoPill({ label, a, icon = 'camera' }) {
     </Pressable>
   );
 }
-const camToggle = () => S.fixtureCam
-  ? <DemoPill label="Use live camera" a="livecam" icon="refresh" />
-  : <DemoPill label="Skip camera (demo image)" a="useFixtureCam" icon="camera" />;
 
-/* Step 4: view the sample with the phone camera and line it up */
-screens.align = () => (
-  <Shell idx={4} left={[backBtn('go', 'pair'), helpBtn()]} right={[B('Looks good', 'go', 'camera', 'primary', false, 'arrow')]}>
-    <View style={[BODY, { gap: 10, alignItems: 'center', paddingBottom: 8 }]}>
-      <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Line it up</Txt>
-      <Sub>Hold the phone steady above the sample.</Sub>
-      {camView(S.session.sampleType, false)}
-      {chip('Center it inside the outline', 'info', 'check', { alignSelf: 'center' })}
-      {camToggle()}
-    </View>
-  </Shell>
-);
-
-screens.camera = () => {
-  const s = S.session, t = s.sampleType, blur = S.demo.quality === 'blurry' && S.fixtureCam, linked = s.phone === 'connected';
+/* Step 4: shows the top-down illustration (SAMPLETOPDOWN.png) so the grader knows how to place the sample */
+screens.align = () => {
+  const s = S.session;
+  const w = Math.min(360, Dimensions.get('window').width - 40);
   return (
-    <Shell idx={5} left={[backBtn('go', 'align'), helpBtn()]} right={[B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || !linked, 'camera')]}>
-      <View style={[BODY, { gap: 10, alignItems: 'center', paddingBottom: 8 }]}>
+    <Shell idx={4} left={[backBtn('go', 'pair'), helpBtn()]} right={[B('Looks good', 'go', 'camera', 'primary', false, 'arrow')]}>
+      <View style={[BODY, { gap: 14, alignItems: 'center', paddingBottom: 8 }]}>
+        <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Line it up</Txt>
+        <Sub>Place the sample in the tray like this, cut face up and inside the outline.</Sub>
+        <View style={{ width: w }}>
+          <ChamberLine w={w} />
+          <View pointerEvents="none" style={{ position: 'absolute', top: '16%', bottom: '16%', left: '18%', right: '18%', borderWidth: 4, borderStyle: 'dashed', borderColor: 'rgba(93,217,245,0.95)', borderRadius: 36 }} />
+        </View>
+        {chip(`Sample: ${TYPES[s.sampleType].name}`, '', 'tag', { alignSelf: 'center' })}
+        {chip('Center it inside the outline', 'info', 'check', { alignSelf: 'center' })}
+      </View>
+    </Shell>
+  );
+};
+
+/* Step 5: the live phone camera (always the real camera, never an illustration) */
+screens.camera = () => {
+  const s = S.session, t = s.sampleType, linked = s.phone === 'connected';
+  return (
+    <Shell idx={5} left={[backBtn('go', 'align'), helpBtn()]} right={[B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || !linked || !S.camReady, 'camera')]}>
+      <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
         <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Take the photo</Txt>
         <Sub>Keep the sample still and in the outline.</Sub>
-        {camView(t, blur)}
+        {camView(t)}
         {S.demo.quality === 'blurry' ? chip('Check focus', 'amber', 'warn', { alignSelf: 'center' }) : null}
-        {camToggle()}
       </View>
     </Shell>
   );
@@ -1334,7 +1520,7 @@ screens.review = () => {
   const s = S.session, p = s.pending, bad = p.quality === 'blurry';
   const tone = p.code === 'INV' ? 'X' : p.code === 'UNC' ? 'B' : MAP[p.code].label;
   return (
-    <Shell idx={5} left={[B('Retake', 'retake', '', 'ghost', false, 'refresh'), helpBtn()]} right={[B('Use image', 'useImage', '', 'primary', bad, 'check')]}>
+    <Shell idx={5} left={[backBtn('retake'), B('Retake', 'retake', '', 'ghost', false, 'refresh'), helpBtn()]} right={[B('Use image', 'useImage', '', 'primary', bad, 'check')]}>
       <View style={[BODY, { paddingBottom: 8, gap: 10 }]}>
         <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>{photo(p.uri, tone, p.type, bad)}</ImgFrame>
         <Card style={{ gap: 12 }}>
@@ -1415,7 +1601,7 @@ screens.result = () => {
   const s = S.session, c = s.captures[s.captures.length - 1], p = priceFor(s), r = resolve(s);
   const g = r.status === 'final' ? r.grade : c.label, manual = r.origin === 'manual', pct = Math.round(c.score * 100);
   return (
-    <Shell idx={6} left={[B('Retake', 'retakeSaved', '', 'ghost', false, 'refresh'), helpBtn()]}
+    <Shell idx={6} left={[backBtn('go', 'sample'), B('Retake', 'retakeSaved', '', 'ghost', false, 'refresh'), helpBtn()]}
       right={[s.captures.length < 2 ? B('Add other sample', 'addOther', '', '', false, 'tag') : null, B('Confirm', 'confirmQuote', '', 'primary', !p.ok, 'check')]}>
       <View style={[BODY, { gap: 10, paddingBottom: 8 }]}>
         <Card lift style={{ alignItems: 'center', gap: 2, paddingVertical: 20, backgroundColor: GBG[g] }}>
@@ -1450,7 +1636,7 @@ screens.invalid = () => {
   const s = S.session, c = s.captures[s.captures.length - 1]; const inv = c.outcome === 'invalid';
   const hasOther = s.captures.some((x) => x.id !== c.id && x.outcome === 'accepted');
   return (
-    <Shell idx={6} left={[helpBtn()]} right={[hasOther ? B('Discard sample', 'discardSample', '', 'small danger') : null, !inv ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Retake', 'retakeSaved', '', 'primary', false, 'refresh')]}>
+    <Shell idx={6} left={[backBtn('go', 'sample'), helpBtn()]} right={[hasOther ? B('Discard sample', 'discardSample', '', 'small danger') : null, !inv ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Retake', 'retakeSaved', '', 'primary', false, 'refresh')]}>
       <View style={[BODY, { paddingBottom: 8, gap: 10 }]}>
         <Card lift style={{ alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: inv ? C.warnbg : C.amberbg }}>
           {inv ? chip('Image rejected', '', 'warn') : chip('Needs another look', 'amber', 'warn')}
@@ -1467,20 +1653,21 @@ screens.invalid = () => {
 
 screens.paired = () => {
   const s = S.session, r = resolve(s);
-  const caps = ['core', 'tail'].map((t) => s.captures.find((c) => c.type === t)).filter(Boolean);
+  const ecaps = effCaps(s);
+  const caps = ['core', 'tail'].map((t) => ecaps.find((c) => c.type === t)).filter(Boolean);
   const panel = (c) => {
     const acc = c.outcome === 'accepted';
     return (
       <Card key={c.type} style={{ gap: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <Txt k="h2">{TYPES[c.type].name}</Txt>
-          {acc ? chip('Accepted', 'ok', 'check') : c.outcome === 'uncertain' ? chip('Uncertain', 'amber', 'warn') : chip('Rejected', '', 'warn')}
+          {c.overridden ? chip('Overridden', 'amber', 'edit') : acc ? chip('Accepted', 'ok', 'check') : c.outcome === 'uncertain' ? chip('Uncertain', 'amber', 'warn') : chip('Rejected', '', 'warn')}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
           <ImgFrame style={{ width: 130, height: 98 }}>{imgFor(c)}</ImgFrame>
           <View style={{ flex: 1, gap: 8 }}>
             <Text style={{ fontSize: 56 * TS(), fontWeight: '700', lineHeight: 56 * TS(), color: acc ? GC[c.label] : C.text2 }}>{acc ? c.label : '—'}</Text>
-            <Txt k="sub">{acc ? `Model score ${Math.round(c.score * 100)}%` : c.outcome === 'uncertain' ? `Closest: ${c.label}, ${Math.round(c.score * 100)}%` : 'Rejected input'}</Txt>
+            <Txt k="sub">{c.overridden ? `Model: ${capText(c.raw)}` : acc ? `Model score ${Math.round(c.score * 100)}%` : c.outcome === 'uncertain' ? `Closest: ${c.label}, ${Math.round(c.score * 100)}%` : 'Rejected input'}</Txt>
           </View>
         </View>
       </Card>
@@ -1492,15 +1679,16 @@ screens.paired = () => {
       <View style={{ flex: 1 }}><Txt k="h2" style={{ color: tc }}>{title}</Txt><Txt k="sub" style={subc ? { color: subc } : null}>{sub}</Txt></View>
     </Card>
   );
+  const lastDec = s.decisions.slice(-1)[0];
   let bn;
-  if (r.status === 'final') bn = banner(C.gAbg, '#BFE3D2', 'check', C.gA, `${r.origin === 'model' ? 'Samples agree' : r.origin === 'manual' ? 'Manual override' : 'Expert decision'}: Grade ${r.grade}`, C.gA, r.origin !== 'model' ? s.decisions.slice(-1)[0].reason : 'Each result stays separate. TunaEye does not average or combine scores.');
-  else if (r.conflict) bn = banner(C.amberbg, '#EBD59C', 'warn', C.amber, 'Expert decision required', C.amber, 'Core and tail disagree. Pricing is blocked until an expert decides.', '#5F3B00');
+  if (r.status === 'final') bn = banner(C.gAbg, '#BFE3D2', 'check', C.gA, `${r.origin === 'model' ? 'Samples agree' : r.origin === 'manual' ? 'Manual override' : 'Expert decision'}: Grade ${r.grade}`, C.gA, r.origin !== 'model' && lastDec ? lastDec.reason : 'Each result stays separate. TunaEye does not average or combine scores.');
+  else if (r.conflict) bn = banner(C.amberbg, '#EBD59C', 'warn', C.amber, 'Expert decision required', C.amber, 'Core and tail disagree. Override one sample, or have an expert decide, before pricing.', '#5F3B00');
   else bn = banner(C.amberbg, '#EBD59C', 'warn', C.amber, 'Not ready for a price', C.amber, `${r.reason || ''}. Retake the sample or ask an expert.`, '#5F3B00');
   const retakeCap = caps.find((c) => c.outcome !== 'accepted');
   return (
-    <Shell idx={6} left={[retakeCap ? B('Retake ' + TYPES[retakeCap.type].short, 'retakeType', retakeCap.type, '', '', 'refresh') : null, helpBtn()]}
+    <Shell idx={6} left={[backBtn('go', 'sample'), retakeCap ? B('Retake ' + TYPES[retakeCap.type].short, 'retakeType', retakeCap.type, '', '', 'refresh') : null, helpBtn()]}
       right={[r.status !== 'final' ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Continue to price', 'toPrice', '', 'primary', r.status !== 'final', 'arrow')]}>
-      <View style={[BODY, { gap: 16 }]}>{caps.map(panel)}{bn}<DemoPill label={r.origin === 'manual' ? 'Change override' : 'Override grade'} a="override" icon="edit" /></View>
+      <View style={[BODY, { gap: 16 }]}>{caps.map(panel)}{bn}<DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a="override" icon="edit" /></View>
     </Shell>
   );
 };
@@ -1508,23 +1696,28 @@ screens.paired = () => {
 screens.price = () => {
   const s = S.session, p = priceFor(s);
   return (
-    <Shell idx={6} left={[helpBtn()]} right={[B('Confirm', 'confirmQuote', '', 'primary', !p.ok, 'check')]}>
+    <Shell idx={6} left={[backBtn('go', screenAfterGrade(s)), helpBtn()]} right={[B('Confirm', 'confirmQuote', '', 'primary', !p.ok, 'check')]}>
       <View style={[BODY, { gap: 10, paddingBottom: 8 }]}>
         <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Estimated value</Txt>
         {p.ok ? <View style={{ alignItems: 'center' }}>{gradeChip(p.grade)}</View> : null}
         {valueCard(s, p)}
-        <DemoPill label={resolve(s).origin === 'manual' ? 'Change override' : 'Override grade'} a="override" icon="edit" />
+        <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a="override" icon="edit" />
       </View>
     </Shell>
   );
 };
 
-/* ---------- manual override ---------- */
+/* ---------- manual override (with two samples, pick which sample to override) ---------- */
 screens.override = () => {
   const s = S.session, g = S.ui.ovGrade, reason = S.ui.ovReason.trim(), ts = TS();
+  const two = s.captures.length > 1;
+  const tg = two ? S.ui.ovTarget : 'all';
   const has = s.decisions.some((d) => d.manual);
-  const ok = !!g && reason.length >= 5 && S.ui.ovAck;
-  const est = g && s.weightTenths ? calcTotalCentavos(s.weightTenths, S.schedule.rates[g]) : null;
+  const ok = !!g && !!tg && reason.length >= 5 && S.ui.ovAck;
+  const ecaps = effCaps(s);
+  const shown = two && tg && tg !== 'all' ? ecaps.filter((c) => c.type === tg) : ecaps;
+  // Preview the price with the override applied (nothing is saved until "Apply override").
+  const hyp = g && tg ? priceFor({ ...s, decisions: withOverride(s.decisions, g, tg) }) : null;
   const tile = (x) => {
     const sel = g === x;
     return (
@@ -1537,28 +1730,53 @@ screens.override = () => {
       </Pressable>
     );
   };
+  const targetCard = (c) => {
+    const sel = tg === c.type;
+    return (
+      <Pressable key={c.type} onPress={() => act('ovTarget', c.type)} accessibilityRole="button" accessibilityLabel={`Override ${TYPES[c.type].name}`}
+        style={({ pressed }) => [{ flex: 1, minHeight: 112, borderRadius: 22, borderWidth: 3, borderColor: sel ? C.primary : C.border, backgroundColor: sel ? '#EEF4FF' : C.surface, padding: 12, alignItems: 'center', justifyContent: 'center', gap: 4 }, pressed && { transform: [{ scale: 0.98 }] }]}>
+        <SampleIcon type={c.type} size={72} />
+        <Text style={{ fontSize: 15 * ts, fontWeight: '800', color: C.navy }}>{TYPES[c.type].name}</Text>
+        <Text style={{ fontSize: 12.5 * ts, color: C.text2, textAlign: 'center' }}>{c.overridden ? `Overridden to ${c.label}` : capText(c)}</Text>
+        {sel ? <View style={{ position: 'absolute', top: 8, right: 8 }}><Icon n="check" s={20} c={C.primary} w={3} /></View> : null}
+      </Pressable>
+    );
+  };
   return (
     <Shell idx={6} left={[backBtn('cancelOverride'), helpBtn()]}
       right={[has ? B('Remove override', 'clearOverride', '', 'small danger', false, 'x') : null, B('Apply override', 'applyOverride', '', 'primary', !ok, 'check')]}>
-      <View style={[BODY, { gap: 14 }]}>
+      <View style={[BODY, { gap: 16 }]}>
         <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Manual override</Txt>
         <Card style={{ flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: C.amberbg, borderColor: '#EBD59C' }}>
           <Icon n="warn" s={30} c={C.amber} />
-          <Txt k="sub" style={{ flex: 1, color: '#5F3B00' }}>Your grade replaces the model's grade for the price. The model result is kept, and the record is marked as a manual override.</Txt>
+          <Txt k="sub" style={{ flex: 1, color: '#5F3B00' }}>{two ? "Your grade replaces the model's grade for the sample you pick. The model result is kept, and the record is marked as a manual override." : "Your grade replaces the model's grade for the price. The model result is kept, and the record is marked as a manual override."}</Txt>
         </Card>
+        {two ? (
+          <View style={{ gap: 8 }}>
+            <Txt k="h2">Which sample?</Txt>
+            <View style={{ flexDirection: 'row', gap: 10 }}>{ecaps.map(targetCard)}</View>
+            <Pressable onPress={() => act('ovTarget', 'all')} accessibilityRole="button"
+              style={({ pressed }) => [{ minHeight: 52, borderRadius: 20, borderWidth: 3, borderColor: tg === 'all' ? C.primary : C.border, backgroundColor: tg === 'all' ? '#EEF4FF' : C.surface, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, pressed && { transform: [{ scale: 0.98 }] }]}>
+              {tg === 'all' ? <Icon n="check" s={20} c={C.primary} w={3} /> : null}
+              <Text style={{ fontSize: 15 * ts, fontWeight: '700', color: C.navy, flexShrink: 1, textAlign: 'center' }}>Set the final grade for both samples</Text>
+            </Pressable>
+            {!tg ? <Txt k="det" style={{ textAlign: 'center' }}>Pick a sample to continue.</Txt> : null}
+          </View>
+        ) : null}
         <Card style={{ gap: 4 }}>
           <Txt k="label">Model result</Txt>
-          {s.captures.map((c) => (
+          {shown.map((c) => (
             <Text key={c.id} style={{ fontSize: 16 * ts, color: C.navy }}>
               <Text style={{ fontWeight: '700' }}>{TYPES[c.type].name}: </Text>
-              {c.outcome === 'accepted' ? `Grade ${c.label} at ${Math.round(c.score * 100)}%` : c.outcome === 'uncertain' ? `Uncertain, closest ${c.label} at ${Math.round(c.score * 100)}%` : 'Rejected image'}
+              {c.overridden ? `Overridden to Grade ${c.label} (model: ${capText(c.raw)})` : capText(c)}
             </Text>
           ))}
         </Card>
         <View style={{ gap: 8 }}>
-          <Txt k="h2">Your grade</Txt>
+          <Txt k="h2">{two && tg && tg !== 'all' ? `Your grade for ${TYPES[tg].name}` : 'Your grade'}</Txt>
           <View style={{ flexDirection: 'row', gap: 10 }}>{['A', 'B', 'C'].map(tile)}</View>
-          {est != null ? chip(`New estimate ${fmtMoney(est)}`, 'info', 'tag', { alignSelf: 'center', marginTop: 4 }) : null}
+          {hyp && hyp.ok ? chip(`New estimate ${fmtMoney(hyp.total)}`, 'info', 'tag', { alignSelf: 'center', marginTop: 4 }) : null}
+          {hyp && !hyp.ok ? chip(hyp.kind === 'grade' ? 'The samples would still disagree. Override the other sample too.' : hyp.why, 'amber', 'warn', { alignSelf: 'center', marginTop: 4 }) : null}
         </View>
         <View style={{ gap: 8 }}>
           <Txt k="h2">Why are you overriding?</Txt>
@@ -1586,18 +1804,61 @@ screens.override = () => {
   );
 };
 
+/* ---------- on-screen receipt (new "TUNAEYE KIOSK" layout, lists every sample) ---------- */
 function Paper({ r }) {
-  const q = r.quote, cap = r.captures.map((c) => TYPES[c.type].short).join(' + ');
-  const T = (p) => <Text {...p} style={[{ fontFamily: MONO, fontSize: 14, lineHeight: 21, color: '#222' }, p.style]} />;
-  const hr = <Text numberOfLines={1} style={{ fontFamily: MONO, fontSize: 14, color: '#999', marginVertical: 4 }}>{'- '.repeat(14)}</Text>;
-  const big = { fontSize: 20, fontWeight: '700', lineHeight: 28 };
+  const q = r.quote, lines = sampleLines(r), bc = barcodeBars(r.id);
+  const M = { fontFamily: MONO, color: '#1a1a18' };
+  const dash = <View style={{ borderTopWidth: 1, borderStyle: 'dashed', borderColor: '#B5B5AE', marginVertical: 14 }} />;
+  const row = (l, rt, o = {}) => (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginVertical: 5 }}>
+      <Text style={[M, { fontSize: 14, color: o.boldL ? '#1a1a18' : '#6B6B66', fontWeight: o.boldL ? '700' : '400' }]}>{l}</Text>
+      <Text style={[M, { fontSize: 14, fontWeight: o.bold ? '700' : '400', flexShrink: 1, textAlign: 'right' }]}>{rt}</Text>
+    </View>
+  );
   return (
-    <View style={{ backgroundColor: '#fff', width: 290, paddingVertical: 24, paddingHorizontal: 22, borderRadius: 4, shadowColor: C.navy, shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 4 }}>
-      <T style={[big, { textAlign: 'center' }]}>TUNAEYE</T><T style={{ textAlign: 'center' }}>Davao landing center (demo)</T>{hr}
-      <T>{`Record ${r.id}`}</T><T>{fmtTime(q.confirmedAt)}</T><T>{`Grader: ${r.grader || '—'}`}</T>{hr}
-      <T>{`Sample: ${cap}`}</T><T>{`Basis: ${r.final.basis}`}</T><T>{`Grade origin: ${ORIGIN[r.final.origin]}`}</T><T style={big}>{`GRADE ${r.final.grade}`}</T>{hr}
-      <T>{`Weight (manual): ${fmtKg(q.weightTenths)}`}</T><T>{`Rate: ${fmtMoney(q.rateC)}/kg`}</T><T style={big}>{fmtMoney(q.totalC)}</T><T>{`Schedule v${q.scheduleVersion}`}</T>{hr}
-      <T style={{ textAlign: 'center', fontSize: 12 }}>{'Decision-support estimate.\nNot a payment record.\nDEMO — not a real receipt'}</T>
+    <View style={{ backgroundColor: '#FBFAF6', width: 320, paddingVertical: 26, paddingHorizontal: 28, borderRadius: 6, shadowColor: C.navy, shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 4, overflow: 'visible' }}>
+      {/* ticket notches */}
+      <View style={{ position: 'absolute', left: -11, top: 150, width: 22, height: 22, borderRadius: 11, backgroundColor: C.canvas }} />
+      <View style={{ position: 'absolute', right: -11, top: 150, width: 22, height: 22, borderRadius: 11, backgroundColor: C.canvas }} />
+
+      <View style={{ alignItems: 'center' }}>
+        <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#ECEBE6', alignItems: 'center', justifyContent: 'center' }}><Icon n="home" s={24} c="#1a1a18" /></View>
+        <Text style={[M, { fontSize: 22, fontWeight: '700', letterSpacing: 1, marginTop: 10 }]}>TUNAEYE KIOSK</Text>
+        <Text style={[M, { fontSize: 13, color: '#6B6B66', marginTop: 4 }]}>Certified Quality Inspection</Text>
+      </View>
+      {dash}
+      {row('ORDER NO:', `#${r.id}`, { bold: true })}
+      {row('DATE:', fmtReceiptDate(q.confirmedAt))}
+      {row('INSPECTOR:', r.grader || '—')}
+      {dash}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+        <Text style={[M, { fontSize: 12, fontWeight: '700', color: '#6B6B66' }]}>ITEM</Text>
+        <Text style={[M, { fontSize: 12, fontWeight: '700', color: '#6B6B66' }]}>GRADE</Text>
+      </View>
+      {lines.map((l, i) => (
+        <View key={i} style={{ marginBottom: 8 }}>
+          {row(l.name, `Grade ${l.grade}`, { boldL: true, bold: true })}
+          <Text style={[M, { fontSize: 12, fontStyle: 'italic', color: '#6B6B66', marginTop: -2 }]}>{l.note}</Text>
+        </View>
+      ))}
+      {row('Weight (manual)', fmtKg(q.weightTenths), { bold: true })}
+      {row('Rate', `${fmtMoney(q.rateC)}/kg`)}
+      {row('Estimate', fmtMoney(q.totalC), { bold: true })}
+      <View style={{ borderTopWidth: 1, borderColor: '#D5D5CE', marginTop: 10 }} />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 12 }}>
+        <Text style={[M, { fontSize: 20, fontWeight: '700' }]}>TOTAL:</Text>
+        <Text style={[M, { fontSize: 22, fontWeight: '700' }]}>{`Grade ${r.final.grade}`}</Text>
+      </View>
+      <Text style={[M, { fontSize: 12, fontStyle: 'italic', color: '#6B6B66' }]}>{r.final.basis}</Text>
+      {dash}
+      <View style={{ alignItems: 'center', gap: 8 }}>
+        <Svg width="100%" height={56} viewBox={`0 0 ${bc.width} 40`} preserveAspectRatio="none">
+          {bc.bars.map((b, i) => <Rect key={i} x={b.x} y={0} width={b.w} height={40} fill="#4A4A46" />)}
+        </Svg>
+        <Text style={[M, { fontSize: 12, color: '#6B6B66', letterSpacing: 1 }]}>{`* ${r.id} *`}</Text>
+      </View>
+      <Text style={[M, { fontSize: 13, textAlign: 'center', marginTop: 16 }]}>Thank you for using TunaEye Kiosk!</Text>
+      <Text style={[M, { fontSize: 11, textAlign: 'center', color: '#9B9B95', marginTop: 6 }]}>{'Decision-support estimate.\nNot a payment record.'}</Text>
     </View>
   );
 }
@@ -1617,7 +1878,7 @@ screens.receipt = () => {
           <Sub>Choose how you want to keep the receipt: print it or keep a copy on the phone.</Sub>
         </View>
         <View style={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}>
-          <View style={{ transform: [{ scale: 0.88 }] }}>
+          <View style={{ transform: [{ scale: 0.92 }] }}>
             <Paper r={r} />
           </View>
         </View>
@@ -1711,7 +1972,7 @@ function recordDetail(r) {
   const rows = [['Graded by', r.grader || '—']];
   r.captures.forEach((c) => rows.push([`${TYPES[c.type].name} · attempt ${c.attempt}`, c.outcome === 'accepted' ? `Grade ${c.label} · ${Math.round(c.score * 100)}%` : c.outcome === 'uncertain' ? `Uncertain · ${c.label}? ${Math.round(c.score * 100)}%` : 'Rejected input']));
   const withDet = (main, det) => <><Text style={{ fontSize: 16 * TS(), fontWeight: '600', color: C.navy, textAlign: 'right' }}>{main}</Text><Txt k="det" style={{ textAlign: 'right' }}>{det}</Txt></>;
-  r.decisions.forEach((d) => rows.push([d.manual ? 'Manual override' : 'Expert decision', withDet(d.grade ? 'Grade ' + d.grade : 'Unresolved', `${d.reason}\n${d.actor} · ${fmtClock(d.ts)}`)]));
+  r.decisions.forEach((d) => rows.push([(d.manual ? 'Manual override' : 'Expert decision') + (d.target ? ' · ' + TYPES[d.target].short : ''), withDet(d.grade ? 'Grade ' + d.grade : 'Unresolved', `${d.reason}\n${d.actor} · ${fmtClock(d.ts)}`)]));
   rows.push(['Final grade', f.status === 'final' ? `Grade ${f.grade} · ${f.basis}` : 'Unresolved']);
   rows.push(['Weight (manual)', fmtKg(r.weightTenths)]);
   rows.push(['Quote', q ? withDet(fmtMoney(q.totalC), `${fmtKg(q.weightTenths)} × ${fmtMoney(q.rateC)}/kg · schedule v${q.scheduleVersion} · rev ${q.revision}`) : 'None yet']);
@@ -1793,15 +2054,15 @@ screens.expert = () => {
 
 screens.sync = () => {
   const c = counts(), sy = S.syncing; const queue = S.records.filter((r) => r.sync !== 'local');
-  const conn = S.net === 'online' ? chip('Cloud reachable (demo)', 'ok', 'cloud') : S.net === 'wifi' ? chip('Wi-Fi connected, no cloud access', 'amber', 'cloudoff') : chip('Offline', 'amber', 'cloudoff');
+  const conn = S.net === 'online' ? chip('Cloud reachable', 'ok', 'cloud') : S.net === 'wifi' ? chip('Wi-Fi connected, no cloud access', 'amber', 'cloudoff') : chip('Offline', 'amber', 'cloudoff');
   const rows = queue.length ? queue.map((r) => {
-    const k = r.sync === 'synced' ? 'ok' : r.sync === 'failed' ? 'err' : r.sync === 'uploading' ? 'info' : 'amber';
-    const pct = r.sync === 'uploading' ? (r.stage === 'Staging image' ? 35 : 80) : r.sync === 'synced' ? 100 : r.sync === 'failed' ? 60 : 0;
+    const k = r.sync === 'synced' ? 'ok' : r.sync === 'failed' ? 'err' : r.sync === 'syncing' ? 'info' : 'amber';
+    const pct = r.sync === 'syncing' ? ({ 'Signing in': 10, 'Uploading image': 35, 'Saving record': 65, Verifying: 90 }[r.stage] || 20) : r.sync === 'synced' ? 100 : r.sync === 'failed' ? 60 : 0;
     return (
       <Card key={r.id} style={{ paddingVertical: 14, paddingHorizontal: 16, gap: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-          <View style={{ flex: 1 }}><Text style={{ fontWeight: '700', fontSize: 16 * TS(), color: C.navy }}>{r.id}</Text><Txt k="det">{(r.offlineOrigin ? 'Created offline' : 'Created online') + (r.stage ? ' · ' + r.stage : '')}</Txt></View>
-          {chip({ pending: 'Pending', uploading: 'Uploading', synced: 'Uploaded', failed: 'Failed' }[r.sync], k)}
+          <View style={{ flex: 1 }}><Text style={{ fontWeight: '700', fontSize: 16 * TS(), color: C.navy }}>{r.id}</Text><Txt k="det">{(r.offlineOrigin ? 'Created offline' : 'Created online') + (r.stage ? ' · ' + r.stage : '') + (r.sync === 'failed' && r.lastSyncError ? ' · ' + r.lastSyncError : '')}</Txt></View>
+          {chip({ pending: 'Pending', syncing: 'Syncing', synced: 'Uploaded', failed: 'Failed' }[r.sync], k)}
         </View>
         <View style={{ height: 10, borderRadius: 5, backgroundColor: C.border, overflow: 'hidden' }}><View style={{ height: '100%', width: `${pct}%`, backgroundColor: C.primary }} /></View>
       </Card>
@@ -1809,7 +2070,7 @@ screens.sync = () => {
   }) : <Card style={{ alignItems: 'center', gap: 8, padding: 40 }}><Icon n="check" s={44} c={C.gA} /><Txt k="h2">Nothing to upload</Txt><Txt k="sub">New results appear here after they are saved.</Txt></Card>;
   return (
     <Shell idx={0} left={[backBtn('go', S.auth ? 'console' : 'welcome'), helpBtn()]}
-      right={[c.failed ? B('Retry failed', 'retryFailed', '', '', !cloudOk() || sy.active) : null, B('Sync now', 'syncNow', '', 'primary', !cloudOk() || sy.active || !c.pending, 'refresh')]}>
+      right={[c.failed ? B('Retry failed', 'retryFailed', '', '', !cloudOk() || sy.active) : null, B('Sync now', 'syncNow', '', 'primary', !cloudOk() || sy.active || !(c.pending + c.failed), 'refresh')]}>
       <View style={[BODY, { gap: 16 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           {conn}{chip('Pending ' + c.pending, c.pending ? 'amber' : 'ok')}{chip('Failed ' + c.failed, c.failed ? 'err' : '')}{chip('Uploaded ' + c.synced, 'ok')}
@@ -1835,7 +2096,7 @@ screens.diag = () => {
         <Txt k="h2" style={{ marginBottom: 8 }}>Device status</Txt>
         {row('Phone camera', 'Scans the kiosk QR, views and photographs the sample', 'info', 1)}{row('Model', 'No real model loaded', 'amber')}{row('Storage', 'Writable (device memory)', 'info', 1)}
         {row('USB link to Pi', 'Not connected in demo', 'amber')}{row('Printer', 'Status not confirmable', 'amber', 1)}
-        {row('Cloud', S.net === 'online' ? 'Reachable (demo)' : S.net === 'wifi' ? 'Wi-Fi only' : 'Offline', S.net === 'online' ? 'ok' : 'amber')}
+        {row('Cloud', S.net === 'online' ? 'Reachable' : S.net === 'wifi' ? 'Wi-Fi only' : 'Offline', S.net === 'online' ? 'ok' : 'amber')}
         {row('Inter font', 'Not loaded · system sans in use', 'amber', 0, true)}
       </Card>
     </Shell>
@@ -1886,16 +2147,16 @@ const HELP = {
   welcome: 'Press Start grading to begin. Have the fish weight from your scale ready.',
   weight: "Type the grader's name, then read the weight from the external scale and type it in kilograms with your keyboard. Use one decimal place.",
   sample: 'Choose the type of sample you will place in the chamber. You can add the other type afterward.',
-  align: 'Point your phone at the sample and move it until the cut face sits inside the dashed outline. Then tap Looks good.',
+  align: 'The picture shows how the sample sits in the tray. Place the cut face up and inside the dashed outline, then tap Looks good.',
   pair: 'Point your phone camera at the QR code on the kiosk. Allow camera access if asked. Keep the code inside the corners.',
   onboarding: 'Use Next to step through the quick tour. You can replay it from the home screen with How it works.',
-  camera: 'Check the sample is inside the outline and sharp, then tap Take photo. Your phone takes the photo.',
+  camera: 'Allow camera access if asked. Check the sample is inside the outline and sharp, then tap Take photo. Your phone takes the photo.',
   review: 'Check the picture your phone took. Use it only if it is sharp and centered, or retake it.',
   result: 'The grade comes from color and clarity only. Check the estimated value, fix the weight if the reading was wrong, then tap Confirm. If the grade looks wrong, use Override grade.',
   invalid: 'Retake the image. If a sample keeps coming back uncertain, override the grade manually or ask an expert to review it.',
-  paired: 'Each sample keeps its own result. If they disagree, an expert chooses the final grade, or you can override it manually.',
+  paired: 'Each sample keeps its own result. If they disagree, override one sample yourself or have an expert choose the final grade.',
   price: 'The estimate is weight × the approved rate for the grade. Fix the weight if the reading was wrong.',
-  override: 'Pick the grade you believe is right and say why. It replaces the model grade for the price. The model result is kept on the record.',
+  override: 'With two samples, first pick which sample to override (or set the final grade for both). Then pick the grade and say why. The model result is kept on the record.',
   receipt: 'Print is optional. Your result is already saved.',
   records: 'Select a record to see its model output, review and price details.',
   sync: 'Sync now uploads results saved while offline. New results upload on their own when the cloud is reachable.',
@@ -1987,12 +2248,11 @@ function demoAct(d) {
   else if (k === 'cloudfail') D.cloudFailNext = D.cloudFailNext > 0 ? 0 : 1;
   else if (k === 'sch') S.schedule.expired = v === 'exp';
   else if (k === 'su') D.startupFault = v;
-  else if (k === 'cam') S.fixtureCam = v === 'demo';
   else if (k === 'tips') { S.tips = true; S.coached = {}; }
   else if (k === 'onb') { S.drawer = false; S.onbStep = 0; go('onboarding'); return; }
   else if (k === 'rerun') { clearPublicSession(); S.auth = null; S.login = null; S.dialog = null; S.drawer = false; runStartup(); return; }
   else if (k === 'reset') {
-    clearTimers(); S.records = []; S.counter = 7; seed();
+    clearTimers(); const real = S.records.filter((x) => !x.demo); S.records = []; S.counter = 7; seed(); S.records = isSupabaseConfigured() ? real : [...real, ...S.records];
     S.schedule = { ...S.schedule, version: 3, id: 'PS-DEMO-03', expired: false, validUntil: 'Oct 31, 2026' };
     S.demo = { queue: [], next: 'A', quality: 'ok', printer: 'ok', timeoutOnce: false, cloudFailNext: 0, startupFault: 'none' };
     S.net = 'online'; S.shift.open = true; S.phoneLinked = false; S.kioskId = ''; S.tips = true; S.coached = {};
@@ -2019,7 +2279,6 @@ function Drawer() {
         {h3('Faults (fire once)')}{grp([b('Printer fails', D.printer === 'fail', 'pr:fail'), b('Paper out', D.printer === 'paper', 'pr:paper'), b('Analysis timeout', D.timeoutOnce, 'timeout'), b('Cloud upload fails', D.cloudFailNext > 0, 'cloudfail')])}
         {h3('Pricing')}{grp([b('Schedule valid', !S.schedule.expired, 'sch:ok'), b('Schedule expired', S.schedule.expired, 'sch:exp')])}
         {h3('Startup')}{grp([b('Normal', D.startupFault === 'none', 'su:none'), b('Phone link fault', D.startupFault === 'camera', 'su:camera'), b('Model missing', D.startupFault === 'model', 'su:model'), b('Re-run startup', 0, 'rerun')])}
-        {h3('Camera source')}{grp([b('Phone camera', !S.fixtureCam, 'cam:phone'), b('Demo image', S.fixtureCam, 'cam:demo')])}
         {h3('Staff PINs (demo)')}{p("Administrator 1234 · Expert grader 2468. Admin can't decide grades.")}
         {h3('Data')}{grp([b('Replay onboarding', 0, 'onb'), b('Show tips again', 0, 'tips'), b('Reset all demo data', 0, 'reset')])}
       </ScrollView>
@@ -2030,10 +2289,33 @@ function Drawer() {
 /* ====================================================================== */
 /* app                                                                     */
 /* ====================================================================== */
+/** Load locally persisted records. Real records survive restarts; demo fixtures are never synced. */
+async function hydrateRecords() {
+  const stored = await loadStoredRecords();
+  for (const r of stored) if (!r.closed && r.captures.length && r.sync === 'local') { r.closed = true; r.sync = 'pending'; r.offlineOrigin = true; } // app was killed mid-session: keep the graded result
+  const demo = isSupabaseConfigured() ? [] : S.records.filter((r) => r.demo);
+  S.records = [...stored, ...demo].sort((a, b) => b.createdAt - a.createdAt);
+}
 export default function App() {
   const [, force] = useReducer((x) => x + 1, 0);
   rerender = force;
-  useEffect(() => { runStartup(); return () => { clearTimers(); rerender = () => {}; }; }, []);
+  useEffect(() => {
+    let alive = true; let unsub = () => {};
+    const netState = (st) => (!st.isConnected ? 'offline' : st.isInternetReachable === false ? 'wifi' : 'online');
+    (async () => {
+      await hydrateRecords();
+      if (!alive) return;
+      const st = await NetInfo.fetch().catch(() => null);
+      if (st && alive) S.net = netState(st);
+      runStartup();
+      if (S.net === 'online') syncNow(); // pending records from earlier sessions
+      unsub = NetInfo.addEventListener((next) => {
+        const was = S.net; S.net = netState(next); render();
+        if (S.net === 'online' && was !== 'online') syncNow(); // connectivity-triggered, not polling/Realtime
+      });
+    })();
+    return () => { alive = false; unsub(); clearTimers(); rerender = () => {}; };
+  }, []);
   const fn = screens[S.screen];
   const hero = HERO_SCREENS.includes(S.screen);
   return (
@@ -2044,10 +2326,10 @@ export default function App() {
         <CoachMark />
         {overlay()}
         {S.toast ? (
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 120, alignItems: 'center', zIndex: 30 }}>
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 170, alignItems: 'center', zIndex: 30 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: S.toast.kind === 'err' ? C.err : C.navy, borderRadius: 20, paddingVertical: 12, paddingHorizontal: 16, maxWidth: '88%', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
               <Icon n={S.toast.kind === 'err' ? 'warn' : 'check'} s={20} c="#fff" w={2.6} />
-              <Text style={{ color: '#fff', fontSize: 15, flexShrink: 1 }}>{S.toast.msg}</Text>
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: S.toast.kind === 'err' ? '700' : '400', flexShrink: 1 }}>{S.toast.msg}</Text>
             </View>
           </View>
         ) : null}
@@ -2073,4 +2355,3 @@ const st = StyleSheet.create({
   h3: { marginTop: 16, marginBottom: 8, fontSize: 14, fontWeight: '700', color: C.chromeText },
   dp: { color: C.chromeSub, marginVertical: 6, fontSize: 13, lineHeight: 18 },
 });
-
