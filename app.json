@@ -26,6 +26,7 @@
         }
       ],
       "expo-font",
+      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }],
       [
         "expo-media-library",
         {
@@ -38,7 +39,8 @@
         {
           "photosPermission": "TunaEye lets you choose a photo of the sample from your gallery."
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "android": {
       "package": "com.yourname.tunaeyekiosk",

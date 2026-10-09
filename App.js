@@ -42,6 +42,8 @@ import { persistEvidence, readEvidence } from './src/sync/evidence';
 import { loadStoredRecords, saveStoredRecords } from './src/sync/localStore';
 import { syncRecord } from './src/sync/syncRecord';
 import * as ImagePicker from 'expo-image-picker';
+import { gradeWithPi, checkPiStatus } from './src/pi/client';
+import { PI_IMAGE_TYPE, MIN_CONFIDENCE } from './src/pi/types';
 
 let fontsLoaded = false;
 
@@ -79,6 +81,7 @@ const IMG = {
   core: require('./assets/images/sashiboCoreFull.png'),
   tail: require('./assets/images/tailCutFull.png'),
 };
+
 const SAMPLE_AR = { core: 2.05, tail: 1.9 }; // width / height of each sample PNG
 const GC = { A: C.gA, B: C.gB, C: C.gC };
 const GBG = { A: C.gAbg, B: C.gBbg, C: C.gCbg };
@@ -116,7 +119,7 @@ const S = {
   schedule: { id: 'PS-DEMO-03', version: 3, rates: { A: 62000, B: 50000, C: 38000 }, effective: 'Oct 1, 2026', validUntil: 'Oct 31, 2026', expired: false, label: 'Demo fixture rates (not an approved schedule)' },
   startup: { state: 'idle', checks: [], fail: null },
   session: null, auth: null, login: null, dialog: null, toast: null, help: false, drawer: false, navDock: false,
-  onboarded: false, onbStep: 0, phoneLinked: false, camReady: false, kioskId: '', scanError: '', lastGrader: '',
+  onboarded: false, onbStep: 0, phoneLinked: false,piStatus: 'disconnected', camReady: false, kioskId: '', scanError: '', lastGrader: '',
   tips: true, coached: {}, barH: 0,
   ui: {
     large: false, batchOpen: false, recFilter: 'all', recSearch: '', recSel: null, reviewGrade: null, reviewReason: '', expertCtx: null,
@@ -268,9 +271,11 @@ const syncLabel = (r) => ({ local: 'Saved on device • Not yet closed', pending
 async function runStartup() {
   const tok = uid(); S.startup = { tok, state: 'running', checks: [], fail: null }; S.screen = 'startup'; render();
   const f = S.demo.startupFault;
+  let piOk = true;
+  try { await checkPiStatus(); } catch (e) { piOk = false; }
   const list = [
     ['Phone link', f === 'camera' ? { ok: false, msg: 'Phone link not responding' } : { ok: true, msg: 'Ready to pair' }],
-    ['Model', f === 'model' ? { ok: false, msg: 'Model file missing' } : { ok: true, msg: 'Fixture loaded (no real model)' }],
+    ['Raspberry Pi', { ok: piOk, msg: piOk ? 'Connected' : 'Not reachable. Join TunaRpi Wi-Fi', soft: true, warn: !piOk }],
     ['Storage', { ok: true, msg: 'Writable' }],
     ['Shift', { ok: S.shift.open, msg: S.shift.open ? 'Open' : 'Closed', soft: true }],
     ['Printer', { ok: true, msg: 'Not confirmed in demo', soft: true, warn: true }],
@@ -303,7 +308,6 @@ function sanitizeWeight(v) {
 }
 
 /* ---------- capture / analysis ---------- */
-const nextCode = () => (S.demo.queue.length ? S.demo.queue.shift() : S.demo.next);
 async function doCapture() {
   if (S.busy) return; const s = S.session; if (!s || !s.sampleType) return;
   if (!S.shift.open) { toast('Shift is closed. Capture is blocked.', 'err'); return; }
@@ -316,7 +320,7 @@ async function doCapture() {
   await sleep(150);
   S.busy = false; S.flash = false;
   if (!S.session || S.session.id !== tok || S.screen !== 'camera') { render(); return; }
-  s.pending = { id: uid(), type: s.sampleType, code: nextCode(), quality: S.demo.quality, ts: Date.now(), uri };
+  s.pending = { id: uid(), type: s.sampleType, ts: Date.now(), uri };
   go('review');
 }
 async function doUpload() {
@@ -333,31 +337,83 @@ async function doUpload() {
   S.picking = false;
   if (!uri) { render(); return; } // the user closed the picker
   if (!S.session || S.session.id !== tok || S.screen !== 'camera') { render(); return; }
-  s.pending = { id: uid(), type: s.sampleType, code: nextCode(), quality: S.demo.quality, ts: Date.now(), uri, source: 'upload' };
+  s.pending = { id: uid(), type: s.sampleType, ts: Date.now(), uri, source: 'upload' };
   go('review');
 }
-const MAP = { A: { label: 'A', score: 0.94, outcome: 'accepted' }, B: { label: 'B', score: 0.88, outcome: 'accepted' }, C: { label: 'C', score: 0.91, outcome: 'accepted' }, UNC: { label: 'B', score: 0.52, outcome: 'uncertain' }, INV: { label: 'Invalid', score: 0.97, outcome: 'invalid' } };
+const piErrorText = (e) => {
+  if (!e) return 'The Raspberry Pi could not grade the image.';
+  if (e.message === 'timeout' || e.name === 'AbortError') return 'The Raspberry Pi took too long to answer.';
+  if (e.message === 'unreachable' || /network request failed/i.test(e.message || '')) return 'Cannot reach the Raspberry Pi. Check you are on the TunaRpi Wi-Fi.';
+  return e.message || 'The Raspberry Pi could not grade the image.';
+};
+
 async function runAnalysis() {
   const s = S.session; if (!s || !s.pending) return;
-  const job = uid(), tok = s.id; s.job = { id: job, stage: 0, state: 'run' }; go('analysis');
+  const job = uid(), tok = s.id;
+  s.job = { id: job, stage: 0, state: 'run' };
+  go('analysis');
   const alive = () => S.session && S.session.id === tok && S.session.job && S.session.job.id === job && S.screen === 'analysis';
-  await sleep(700); if (!alive()) return; s.job.stage = 1; render();
-  if (S.demo.timeoutOnce) { S.demo.timeoutOnce = false; await sleep(2600); if (!alive()) return; s.job.state = 'timeout'; render(); return; }
-  await sleep(1000); if (!alive()) return; s.job.stage = 2; render();
-  await sleep(700); if (!alive()) return;
-  const p = s.pending, m = MAP[p.code];
+  const p = s.pending;
+  const t0 = Date.now();
+  let res;
+
+  try {
+    if (!PI_IMAGE_TYPE[p.type]) throw new Error(`Unsupported sample type: ${p.type}`);
+    s.job.stage = 1;
+    render();
+    res = await gradeWithPi(p.uri, PI_IMAGE_TYPE[p.type]);
+  } catch (e) {
+    if (!alive()) return;
+    s.job.state = 'error';
+    s.job.msg = piErrorText(e);
+    render();
+    return;
+  }
+
+  if (!alive()) return;
+  s.job.stage = 2;
+  render();
+
+  const confidence = Number(res.confidence);
+  const outcome = res.invalid
+    ? 'invalid'
+    : confidence < MIN_CONFIDENCE
+      ? 'uncertain'
+      : 'accepted';
+
   const prior = s.captures.findIndex((c) => c.type === p.type);
   const attempt = s.attempts.filter((a) => a.type === p.type).length + 1;
-  const keptUri = await persistEvidence(p.uri, p.id); if (!alive()) return;
-  const cap = { id: p.id, type: p.type, code: p.code, label: m.label, score: m.score, outcome: m.outcome, inferMs: 640 + Math.floor(Math.random() * 280), attempt, ts: p.ts, uri: keptUri };
+  const keptUri = await persistEvidence(p.uri, p.id);
+  if (!alive()) return;
+
+  const letter = res.letter || res.grade || 'B';
+  const cap = {
+    id: p.id,
+    type: p.type,
+    outcome,
+    attempt,
+    ts: p.ts,
+    uri: keptUri,
+    code: res.invalid ? 'INV' : outcome === 'uncertain' ? 'UNC' : letter,
+    label: res.invalid ? 'Invalid' : letter,
+    score: Number.isFinite(confidence) ? confidence : 0,
+    scores: res.scores || null,
+    piGradingId: res.id || null,
+    inferMs: Number(res.inferMs) || (Date.now() - t0),
+  };
+
   if (prior >= 0) s.attempts.push(s.captures.splice(prior, 1)[0]);
-  s.captures.push(cap); s.pending = null; s.job = null;
+  s.captures.push(cap);
+  s.pending = null;
+  s.job = null;
   persist(s);
-  go(cap.outcome === 'accepted' ? (s.captures.length >= 2 ? 'paired' : 'result') : 'invalid');
-  // Not a Sashibo core or tail cut: the UI stays the same, but a toast pops up.
+
+  go(cap.outcome === 'accepted'
+    ? (s.captures.length >= 2 ? 'paired' : 'result')
+    : 'invalid');
+
   if (cap.outcome === 'invalid') toast('Invalid image', 'err');
 }
-
 /* ---------- print / countdown / toast / dialog ---------- */
 const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -471,11 +527,23 @@ function connectPhone(kioskId) {
 let askCamera = () => {};
 let camRef = null;
 
+async function checkRaspberryPi() {
+  S.piStatus = 'connecting'; render();
+  try {
+    await checkPiStatus();
+    S.piStatus = 'connected';
+  } catch (e) {
+    console.log('Pi connection failed:', e);
+    S.piStatus = 'error';
+  }
+  render();
+}
 /* ====================================================================== */
 /* actions                                                                 */
 /* ====================================================================== */
 const A = {
   retryStartup() { runStartup(); },
+  checkPi() { checkRaspberryPi(); },
   start() { if (!S.shift.open) return; newSession(); go('weight'); },
   openShift() { S.shift = { open: true, since: Date.now(), operator: 'Operator 01 (Demo)' }; render(); },
   closeShift() { ask('Close the shift?', 'Grading will be blocked until a shift is opened again. Saved results are kept.', [{ label: 'Keep open', act: 'closeDialog' }, { label: 'Close shift', act: 'doCloseShift', kind: 'danger' }]); },
@@ -1155,8 +1223,6 @@ screens.welcome = () => {
 
   const name = (S.lastGrader || '').trim().split(' ')[0];
 
-  const recent = histList().slice(0, 2);
-
   const dot = S.net === 'online' ? '#5BE3A3' : '#FFC94D';
   
   return (
@@ -1606,25 +1672,19 @@ screens.camera = () => {
 };
 
 screens.review = () => {
-  const s = S.session, p = s.pending, bad = p.quality === 'blurry';
-  const tone = p.code === 'INV' ? 'X' : p.code === 'UNC' ? 'B' : MAP[p.code].label;
+  const s = S.session, p = s.pending;
+  const tone = 'X';
+  const bad = false;
   return (
-    <Shell idx={5} left={[backBtn('retake'), B('Retake', 'retake', '', 'ghost', false, 'refresh'), helpBtn()]} right={[B('Use image', 'useImage', '', 'primary', bad, 'check')]}>
+    <Shell idx={5} left={[backBtn('retake'), B('Retake', 'retake', '', 'ghost', false, 'refresh'), helpBtn()]} right={[B('Use image', 'useImage', '', 'primary', false, 'check')]}>
       <View style={[BODY, { paddingBottom: 8, gap: 10 }]}>
         <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>{photo(p.uri, tone, p.type, bad)}</ImgFrame>
         <Card style={{ gap: 12 }}>
           <Txt k="h2">Check the image</Txt>
-          {bad ? (
-            <>
-              {chip('Image is out of focus', 'err', 'x', { paddingVertical: 10, paddingHorizontal: 16 })}
-              <Txt>This image can't be graded. Retake it with the sample still and centered.</Txt>
-            </>
-          ) : (
-            <>
-              {chip('Image looks usable', 'ok', 'check')}
-              <Txt>The sample is in frame and the picture is sharp.</Txt>
-            </>
-          )}
+          <>
+            {chip('Image ready for grading', 'ok', 'check')}
+            <Txt>The image will be sent to the Raspberry Pi for grading.</Txt>
+          </>
           <Txt k="det">{`Sample: ${TYPES[p.type].name}`}</Txt>
         </Card>
       </View>
@@ -1634,7 +1694,7 @@ screens.review = () => {
 
 screens.analysis = () => {
   const s = S.session, j = s.job || { stage: 0, state: 'run' }, p = s.pending;
-  const stages = ['Checking image', 'Analyzing on this device', 'Saving on device'];
+  const stages = ['Checking image', 'Waiting for the Raspberry Pi', 'Saving on device'];
   const rail = ['Capture', 'Analyze', 'Result'].map((n, i) => {
     const done = i === 0 || (i === 1 && j.stage >= 2), on = (i === 1 && j.stage < 2) || (i === 2 && j.stage >= 2);
     const col = done ? C.gA : on ? C.primary : C.text2;
@@ -1651,11 +1711,11 @@ screens.analysis = () => {
   return (
     <Bare>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20, paddingHorizontal: 20 }}>
-        <ImgFrame style={{ width: 240, height: 180 }}>{p ? photo(p.uri, p.code === 'INV' ? 'X' : p.code === 'UNC' ? 'B' : MAP[p.code].label, p.type) : null}</ImgFrame>
-        {j.state === 'timeout' ? (
+        <ImgFrame style={{ width: 240, height: 180 }}>{p ? photo(p.uri, 'X', p.type) : null}</ImgFrame>
+        {(j.state === 'timeout' || j.state === 'error') ? (
           <>
-            {chip('Taking longer than expected', 'amber', 'warn')}
-            <Txt style={{ textAlign: 'center', maxWidth: 640 }}>The analysis did not finish in time. Your image is kept. Try again or return to the camera.</Txt>
+            {chip(j.state === 'error' ? 'Could not grade' : 'Taking longer than expected', 'amber', 'warn')}
+            <Txt style={{ textAlign: 'center', maxWidth: 640 }}>{j.msg || 'The analysis did not finish in time. Your image is kept. Try again or return to the camera.'}</Txt>
             <View style={{ flexDirection: 'row', gap: 16 }}>{B('Retake', 'retake', '', '', '', '', { flex: 1 })}{B('Try again', 'retryAnalysis', '', 'primary', '', '', { flex: 1 })}</View>
           </>
         ) : (
@@ -2244,7 +2304,10 @@ screens.diag = () => {
       <Card style={{ marginTop: 8, marginBottom: 16 }}>
         <Txt k="h2" style={{ marginBottom: 8 }}>Device status</Txt>
         {row('Phone camera', 'Scans the kiosk QR, views and photographs the sample', 'info', 1)}{row('Model', 'No real model loaded', 'amber')}{row('Storage', 'Writable (device memory)', 'info', 1)}
-        {row('USB link to Pi', 'Not connected in demo', 'amber')}{row('Printer', 'Status not confirmable', 'amber', 1)}
+       {row('Raspberry Pi',
+  S.piStatus === 'connected' ? 'Connected' : S.piStatus === 'connecting' ? 'Checking…' : S.piStatus === 'error' ? 'Not reachable' : 'Not checked',
+  S.piStatus === 'connected' ? 'ok' : S.piStatus === 'error' ? 'err' : 'amber', 0)}
+{B('Check Raspberry Pi', 'checkPi', '', 'small')}
         {row('Cloud', S.net === 'online' ? 'Reachable' : S.net === 'wifi' ? 'Wi-Fi only' : 'Offline', S.net === 'online' ? 'ok' : 'amber')}
         {row('Inter font', 'Not loaded · system sans in use', 'amber', 0, true)}
       </Card>
@@ -2309,6 +2372,7 @@ const HELP = {
   override: 'With two samples, first pick which sample to override (or set the final grade for both). Then pick the grade and say why. The model result is kept on the record.',
   receipt: 'Print is optional. Your result is already saved.',
   records: 'Select a record to see its model output, review and price details.',
+  history: 'Tap any tuna to see its grade, price, photos and who graded it.',
   sync: 'Sync now uploads results saved while offline. New results upload on their own when the cloud is reachable.',
   default: 'Ask a supervisor if you need help.',
 };
