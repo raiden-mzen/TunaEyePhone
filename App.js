@@ -41,6 +41,7 @@ import { supabaseCloud } from './src/sync/cloud';
 import { persistEvidence, readEvidence } from './src/sync/evidence';
 import { loadStoredRecords, saveStoredRecords } from './src/sync/localStore';
 import { syncRecord } from './src/sync/syncRecord';
+import * as ImagePicker from 'expo-image-picker';
 
 let fontsLoaded = false;
 
@@ -123,7 +124,7 @@ const S = {
   },
   demo: { queue: [], next: 'A', quality: 'ok', printer: 'ok', timeoutOnce: false, cloudFailNext: 0, startupFault: 'none' },
   records: [], counter: 7, lastAck: null, syncing: { active: false, done: 0, total: 0 },
-  busy: false, flash: false, print: null, receiptSaved: false, countdown: 30, paused: false, timers: {}, lock: 0,
+  busy: false, picking: false, flash: false, print: null, receiptSaved: false, countdown: 30, paused: false, timers: {}, lock: 0,
 };
 let rerender = () => {};
 let persistTimer = null;
@@ -316,6 +317,23 @@ async function doCapture() {
   S.busy = false; S.flash = false;
   if (!S.session || S.session.id !== tok || S.screen !== 'camera') { render(); return; }
   s.pending = { id: uid(), type: s.sampleType, code: nextCode(), quality: S.demo.quality, ts: Date.now(), uri };
+  go('review');
+}
+async function doUpload() {
+  if (S.busy || S.picking) return; const s = S.session; if (!s || !s.sampleType) return;
+  if (!S.shift.open) { toast('Shift is closed. Capture is blocked.', 'err'); return; }
+  S.picking = true; render();
+  const tok = s.id; let uri = null;
+  try {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
+    if (!res.canceled && res.assets && res.assets[0]) uri = res.assets[0].uri;
+  } catch (e) {
+    S.picking = false; toast("Couldn't open your photos. Try again.", 'err'); return;
+  }
+  S.picking = false;
+  if (!uri) { render(); return; } // the user closed the picker
+  if (!S.session || S.session.id !== tok || S.screen !== 'camera') { render(); return; }
+  s.pending = { id: uid(), type: s.sampleType, code: nextCode(), quality: S.demo.quality, ts: Date.now(), uri, source: 'upload' };
   go('review');
 }
 const MAP = { A: { label: 'A', score: 0.94, outcome: 'accepted' }, B: { label: 'B', score: 0.88, outcome: 'accepted' }, C: { label: 'C', score: 0.91, outcome: 'accepted' }, UNC: { label: 'B', score: 0.52, outcome: 'uncertain' }, INV: { label: 'Invalid', score: 0.97, outcome: 'invalid' } };
@@ -517,6 +535,7 @@ const A = {
     go('pair');
   },
   capture() { doCapture(); },
+  uploadImage() { doUpload(); },
   retake() { const s = S.session; s.pending = null; s.job = null; go('camera'); },
   useImage() { runAnalysis(); },
   retryAnalysis() { runAnalysis(); },
@@ -1020,7 +1039,7 @@ const COACH = {
   sample: 'Tap the cut you placed in the chamber. You can add the other cut afterward.',
   pair: 'Point your phone at the QR code on the kiosk. It connects by itself.',
   align: 'Place the sample in the tray like the picture shows, then tap Looks good.',
-  camera: 'Hold still, then tap Take photo. You can retake it if it looks blurry.',
+  camera: 'Hold still, then tap Take photo. No camera? Tap Upload image to pick one from your gallery.',
   result: 'This is the suggested grade and price. If it looks wrong, tap Override grade.',
 };
 const COACH_KEYS = Object.keys(COACH);
@@ -1522,10 +1541,14 @@ screens.align = () => {
 screens.camera = () => {
   const s = S.session, t = s.sampleType, linked = s.phone === 'connected';
   return (
-    <Shell idx={5} left={[backBtn('go', 'align'), helpBtn()]} right={[B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || !linked || !S.camReady, 'camera')]}>
+    <Shell idx={5} left={[backBtn('go', 'align'), helpBtn()]}
+      right={[
+        B('Upload image', 'uploadImage', '', '', S.busy || S.picking, 'gallery'),
+        B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera'),
+      ]}>
       <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
         <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Take the photo</Txt>
-        <Sub>Keep the sample still and in the outline.</Sub>
+        <Sub>Keep the sample still and in the outline. No camera? Upload a photo instead.</Sub>
         {camView(t)}
         {S.demo.quality === 'blurry' ? chip('Check focus', 'amber', 'warn', { alignSelf: 'center' }) : null}
       </View>
@@ -2168,7 +2191,7 @@ const HELP = {
   align: 'The picture shows how the sample sits in the tray. Place the cut face up and inside the dashed outline, then tap Looks good.',
   pair: 'Point your phone camera at the QR code on the kiosk. Allow camera access if asked. Keep the code inside the corners.',
   onboarding: 'Use Next to step through the quick tour. You can replay it from the home screen with How it works.',
-  camera: 'Allow camera access if asked. Check the sample is inside the outline and sharp, then tap Take photo. Your phone takes the photo.',
+  camera: 'Allow camera access if asked, then tap Take photo. If the camera is not available, tap Upload image and choose a photo of the sample from your gallery.',
   review: 'Check the picture your phone took. Use it only if it is sharp and centered, or retake it.',
   result: 'The grade comes from color and clarity only. Check the estimated value, fix the weight if the reading was wrong, then tap Confirm. If the grade looks wrong, use Override grade.',
   invalid: 'Retake the image. If a sample keeps coming back uncertain, override the grade manually or ask an expert to review it.',

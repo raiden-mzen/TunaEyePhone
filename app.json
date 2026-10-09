@@ -32,6 +32,12 @@
           "photosPermission": "TunaEye saves receipts to your gallery.",
           "savePhotosPermission": "TunaEye saves receipts to your gallery."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TunaEye lets you choose a photo of the sample from your gallery."
+        }
       ]
     ],
     "android": {

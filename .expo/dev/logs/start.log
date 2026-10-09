@@ -157,3 +157,9 @@
 {"_e":"metro:bundling:progress","_t":1791519002234,"id":"6","progress":0,"total":1,"current":0}
 {"_e":"metro:bundling:done","_t":1791519002515,"id":"6","total":1,"ms":2446.0091}
 {"_e":"metro:client_log","_t":1791519005917,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"root:init","_t":1791526347605,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791526347633,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791526347659,"mode":"development","files":["../..\\..\\.env"],"env":{"EXPO_PUBLIC_SUPABASE_ANON_KEY":"sb_publishable_fCSS9qu_SIDZPxklimXQuQ_dz3dlTM3","EXPO_PUBLIC_SUPABASE_URL":"https://wafhvgwujqgkxffvrvvl.supabase.co"}}
+{"_e":"devserver:start","_t":1791526356720,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791526363897,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791526368350,"plugins":[]}
