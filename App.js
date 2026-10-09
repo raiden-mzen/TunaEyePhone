@@ -120,7 +120,7 @@ const S = {
   tips: true, coached: {}, barH: 0,
   ui: {
     large: false, batchOpen: false, recFilter: 'all', recSearch: '', recSel: null, reviewGrade: null, reviewReason: '', expertCtx: null,
-    ovGrade: null, ovReason: '', ovAck: false, ovTarget: null,
+    ovGrade: null, ovReason: '', ovAck: false, ovTarget: null, histSel: null,
   },
   demo: { queue: [], next: 'A', quality: 'ok', printer: 'ok', timeoutOnce: false, cloudFailNext: 0, startupFault: 'none' },
   records: [], counter: 7, lastAck: null, syncing: { active: false, done: 0, total: 0 },
@@ -500,6 +500,9 @@ const A = {
   hideTips() { S.tips = false; render(); },
   toggleNavDock(v) { S.navDock = v; render(); },
   toggleBatch() { S.ui.batchOpen = !S.ui.batchOpen; render(); },
+  goHistory() { S.ui.histSel = null; go('history'); },
+  openHist(id) { S.ui.histSel = id; render(); },
+  closeHist() { S.ui.histSel = null; render(); },
    weightNext() {
     const s = S.session, c = weightCheck(s.weightStr); if (!c.ok) return;
     if (s.editingWeight) {
@@ -1066,6 +1069,32 @@ function CoachMark() {
   );
 }
 
+/* ---------- history ---------- */
+const histOk = (r) => r.closed && r.captures.length > 0;
+const histList = () => S.records.filter(histOk).sort((a, b) => b.createdAt - a.createdAt);
+
+function HistRow({ r }) {
+  const f = r.final, c = r.captures[0], ts = TS();
+  return (
+    <Pressable
+      onPress={() => act('openHist', r.id)}
+      accessibilityRole="button" accessibilityLabel={`Open ${r.id}`}
+      style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 22, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, width: '100%' }, pressed && { backgroundColor: '#F3F7FE' }]}
+    >
+      <ImgFrame style={{ width: 64, height: 64, borderRadius: 16 }}>{imgFor(c)}</ImgFrame>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 16 * ts, fontWeight: '700', color: C.navy }}>{r.id}</Text>
+        <Txt k="det">{`${r.captures.map((x) => TYPES[x.type].short).join(' + ')} · ${fmtKg(r.weightTenths)}`}</Txt>
+        <Txt k="det">{fmtTime(r.createdAt)}</Txt>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 6 }}>
+        {f.status === 'final' ? gradeChip(f.grade) : chip('Review pending', 'amber')}
+        <Text style={{ fontSize: 14 * ts, fontWeight: '700', color: C.navy }}>{r.quote ? fmtMoney(r.quote.totalC) : '—'}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 /* ====================================================================== */
 /* screens                                                                 */
 /* ====================================================================== */
@@ -1106,13 +1135,30 @@ screens.startup = () => {
 };
 
 screens.welcome = () => {
-  const c = counts(); const pend = c.pending + c.failed + c.syncing; const open = S.shift.open;
+
+  const c = counts();
+  const pend = c.pending + c.failed + c.syncing;
+  const open = S.shift.open;
+
   const dayKey = (t) => manila(t).toISOString().slice(0, 10);
-  const todayN = S.records.filter((r) => dayKey(r.createdAt) === dayKey(Date.now())).length;
+
+  const todayN = S.records.filter(
+    (r) => dayKey(r.createdAt) === dayKey(Date.now())
+  ).length;
+
   const hr = manila(Date.now()).getUTCHours();
-  const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+
+  const greet =
+    hr < 12 ? 'Good morning' :
+    hr < 18 ? 'Good afternoon' :
+    'Good evening';
+
   const name = (S.lastGrader || '').trim().split(' ')[0];
+
+  const recent = histList().slice(0, 2);
+
   const dot = S.net === 'online' ? '#5BE3A3' : '#FFC94D';
+  
   return (
     <Hero>
       <View style={{ flex: 1, paddingHorizontal: 22, paddingTop: 14 }}>
@@ -1142,6 +1188,9 @@ screens.welcome = () => {
             {B('Open shift', 'openShift', '', 'primary', false, '', { width: '100%' })}
           </View>
         )}
+         {/* NEW: History gets its own button */}
+        {B('History', 'goHistory', '', '', false, 'list', { width: '100%' })}
+
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           {B('How it works', 'showOnboarding', '', 'ghost', false, 'info')}
           {B(pend ? `Sync (${pend})` : 'Sync', 'goSync', '', 'ghost', false, 'refresh')}
@@ -1932,6 +1981,66 @@ screens.receipt = () => {
     </Shell>
   );
 };
+
+screens.history = () => {
+  const sel = S.ui.histSel ? S.records.find((r) => r.id === S.ui.histSel) : null;
+  if (sel) return histDetail(sel);
+  const list = histList();
+  return (
+    <Shell idx={0} left={[backBtn('go', 'welcome'), helpBtn()]}>
+      <View style={[BODY, { gap: 12, justifyContent: 'flex-start', paddingTop: 12 }]}>
+        <View style={{ alignItems: 'center', gap: 6 }}>
+          <Txt k="title" style={{ fontSize: 34, textAlign: 'center' }}>History</Txt>
+          <Sub>Tap a tuna to see its grade, price and photos.</Sub>
+        </View>
+        {list.length ? list.map((r) => <HistRow key={r.id} r={r} />) : (
+          <Card style={{ alignItems: 'center', gap: 10, padding: 40 }}>
+            <Icon n="list" s={44} c="#7FA6D1" />
+            <Txt k="h2">No grades yet</Txt>
+            <Txt k="sub" style={{ textAlign: 'center' }}>Finished gradings will show up here.</Txt>
+          </Card>
+        )}
+      </View>
+    </Shell>
+  );
+};
+
+function histDetail(r) {
+  const f = r.final, q = r.quote, caps = effCaps(r), ts = TS();
+  const g = f.status === 'final' ? f.grade : null;
+  const rows = [
+    ['Record', r.id],
+    ['Date', fmtTime(r.createdAt)],
+    ['Graded by', r.grader || '—'],
+    ['Weight', fmtKg(r.weightTenths)],
+  ];
+  if (q) { rows.push(['Rate', `${fmtMoney(q.rateC)}/kg`]); rows.push(['Estimate', fmtMoney(q.totalC)]); }
+  rows.push(['Basis', f.status === 'final' ? f.basis : f.reason || 'Unresolved']);
+  rows.push(['Status', syncLabel(r)]);
+  return (
+    <Shell idx={0} left={[backBtn('closeHist'), helpBtn()]}
+      right={[q ? B('Print receipt', 'reprintRec', r.id, 'primary', false, 'print') : null]}>
+      <View style={[BODY, { gap: 12, justifyContent: 'flex-start', paddingTop: 12 }]}>
+        <Card lift style={{ alignItems: 'center', gap: 2, paddingVertical: 20, backgroundColor: g ? GBG[g] : C.amberbg }}>
+          <Txt k="label">{g ? 'Final grade' : 'Not graded yet'}</Txt>
+          <Text style={{ fontSize: 72 * ts, fontWeight: '800', lineHeight: 78 * ts, color: g ? GC[g] : C.amber }}>{g || '—'}</Text>
+          {q ? <Txt k="h2" style={{ color: g ? GC[g] : C.navy }}>{fmtMoney(q.totalC)}</Txt> : null}
+        </Card>
+        {caps.map((c) => (
+          <Card key={c.id} style={{ gap: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <Txt k="h2">{TYPES[c.type].name}</Txt>
+              {c.overridden ? chip('Overridden', 'amber', 'edit') : c.outcome === 'accepted' ? chip(`Grade ${c.label}`, gcls(c.label)) : chip(c.outcome === 'uncertain' ? 'Uncertain' : 'Rejected', 'amber', 'warn')}
+            </View>
+            <ImgFrame style={{ width: '100%', height: 190 }}>{imgFor(c)}</ImgFrame>
+            <Txt k="det">{c.overridden ? `Manual override (model: ${capText(c.raw)})` : capText(c)}</Txt>
+          </Card>
+        ))}
+        <Card><View>{infoRows(rows)}</View></Card>
+      </View>
+    </Shell>
+  );
+}
 
 screens.completion = () => {
   const s = S.session, r = S.records.find((x) => x.id === s.recordId), q = r.quote;
