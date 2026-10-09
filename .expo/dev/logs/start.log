@@ -4,3 +4,105 @@
 {"_e":"devserver:start","_t":1791439265022,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
 {"_e":"metro:config","_t":1791439274306,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
 {"_e":"expo:dev-tools-plugin:load","_t":1791439279464,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791439288106,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791439321004,"id":"1","platform":"android","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1791439321004,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791439321009,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791439321109,"id":"1","progress":0.25,"total":28,"current":14}
+{"_e":"metro:bundling:progress","_t":1791439321218,"id":"1","progress":0.25,"total":174,"current":23}
+{"_e":"metro:bundling:progress","_t":1791439321831,"id":"1","progress":0.25,"total":174,"current":24}
+{"_e":"metro:bundling:progress","_t":1791439321931,"id":"1","progress":0.25,"total":174,"current":26}
+{"_e":"metro:bundling:progress","_t":1791439321946,"id":"1","progress":0.25,"total":174,"current":27}
+{"_e":"metro:bundling:progress","_t":1791439322047,"id":"1","progress":0.25,"total":212,"current":53}
+{"_e":"metro:bundling:progress","_t":1791439322148,"id":"1","progress":0.25,"total":287,"current":125}
+{"_e":"metro:bundling:progress","_t":1791439322249,"id":"1","progress":0.3066345531517576,"total":307,"current":170}
+{"_e":"metro:bundling:progress","_t":1791439322383,"id":"1","progress":0.31025262867510534,"total":307,"current":171}
+{"_e":"metro:bundling:progress","_t":1791439322695,"id":"1","progress":0.3138919245827542,"total":307,"current":172}
+{"_e":"metro:bundling:progress","_t":1791439322795,"id":"1","progress":0.3390482294504086,"total":316,"current":184}
+{"_e":"metro:bundling:progress","_t":1791439322895,"id":"1","progress":0.4099919304456476,"total":392,"current":251}
+{"_e":"metro:bundling:progress","_t":1791439323005,"id":"1","progress":0.4162330905306972,"total":434,"current":280}
+{"_e":"metro:bundling:progress","_t":1791439323090,"id":"1","progress":0.4192114931300304,"total":434,"current":281}
+{"_e":"metro:bundling:progress","_t":1791439323193,"id":"1","progress":0.42740663660538797,"total":465,"current":304}
+{"_e":"metro:bundling:progress","_t":1791439323938,"id":"1","progress":0.4302231471846456,"total":465,"current":305}
+{"_e":"metro:bundling:progress","_t":1791439324040,"id":"1","progress":0.44074075688303316,"total":479,"current":318}
+{"_e":"metro:bundling:progress","_t":1791439324141,"id":"1","progress":0.6615111111111112,"total":525,"current":427}
+{"_e":"metro:bundling:progress","_t":1791439324243,"id":"1","progress":0.6615111111111112,"total":579,"current":461}
+{"_e":"metro:bundling:progress","_t":1791439324564,"id":"1","progress":0.6615111111111112,"total":579,"current":462}
+{"_e":"metro:bundling:progress","_t":1791439324679,"id":"1","progress":0.6615111111111112,"total":580,"current":462}
+{"_e":"metro:bundling:progress","_t":1791439324918,"id":"1","progress":0.6615111111111112,"total":580,"current":463}
+{"_e":"metro:bundling:progress","_t":1791439325018,"id":"1","progress":0.724491336785942,"total":598,"current":509}
+{"_e":"metro:bundling:progress","_t":1791439325119,"id":"1","progress":0.8091524980962075,"total":637,"current":573}
+{"_e":"metro:bundling:progress","_t":1791439325246,"id":"1","progress":0.8148108899398426,"total":637,"current":575}
+{"_e":"metro:bundling:progress","_t":1791439325380,"id":"1","progress":0.8161799671975233,"total":642,"current":580}
+{"_e":"metro:bundling:progress","_t":1791439325480,"id":"1","progress":0.8588773373908809,"total":669,"current":620}
+{"_e":"metro:bundling:progress","_t":1791439325588,"id":"1","progress":0.8744180785061041,"total":678,"current":634}
+{"_e":"metro:bundling:progress","_t":1791439325688,"id":"1","progress":0.9403968972419006,"total":694,"current":673}
+{"_e":"metro:bundling:progress","_t":1791439325793,"id":"1","progress":0.991495431947314,"total":704,"current":701}
+{"_e":"metro:bundling:progress","_t":1791439325903,"id":"1","progress":0.9971611086002066,"total":704,"current":703}
+{"_e":"metro:bundling:progress","_t":1791439335068,"id":"1","progress":0.999,"total":704,"current":704}
+{"_e":"metro:bundling:progress","_t":1791439335335,"id":"1","progress":0.999,"total":705,"current":704}
+{"_e":"metro:bundling:progress","_t":1791439335434,"id":"1","progress":0.999,"total":733,"current":715}
+{"_e":"metro:bundling:progress","_t":1791439335534,"id":"1","progress":0.999,"total":781,"current":733}
+{"_e":"metro:bundling:progress","_t":1791439335639,"id":"1","progress":0.999,"total":833,"current":739}
+{"_e":"metro:bundling:progress","_t":1791439335739,"id":"1","progress":0.999,"total":833,"current":742}
+{"_e":"metro:bundling:progress","_t":1791439335843,"id":"1","progress":0.999,"total":835,"current":784}
+{"_e":"metro:bundling:progress","_t":1791439336045,"id":"1","progress":0.999,"total":835,"current":785}
+{"_e":"metro:bundling:progress","_t":1791439336146,"id":"1","progress":0.999,"total":848,"current":819}
+{"_e":"metro:bundling:progress","_t":1791439336247,"id":"1","progress":0.999,"total":848,"current":827}
+{"_e":"metro:bundling:progress","_t":1791439336348,"id":"1","progress":0.999,"total":853,"current":842}
+{"_e":"metro:bundling:progress","_t":1791439336459,"id":"1","progress":0.999,"total":855,"current":847}
+{"_e":"metro:bundling:progress","_t":1791439336587,"id":"1","progress":0.999,"total":855,"current":850}
+{"_e":"metro:bundling:progress","_t":1791439338637,"id":"1","progress":0.999,"total":855,"current":851}
+{"_e":"metro:bundling:progress","_t":1791439338751,"id":"1","progress":0.999,"total":859,"current":852}
+{"_e":"metro:bundling:progress","_t":1791439338855,"id":"1","progress":0.999,"total":871,"current":860}
+{"_e":"metro:bundling:progress","_t":1791439338999,"id":"1","progress":0.999,"total":903,"current":872}
+{"_e":"metro:bundling:progress","_t":1791439339099,"id":"1","progress":0.999,"total":904,"current":877}
+{"_e":"metro:bundling:progress","_t":1791439339206,"id":"1","progress":0.999,"total":919,"current":901}
+{"_e":"metro:bundling:progress","_t":1791439339302,"id":"1","progress":0.999,"total":926,"current":904}
+{"_e":"metro:bundling:progress","_t":1791439339403,"id":"1","progress":0.999,"total":930,"current":930}
+{"_e":"metro:bundling:done","_t":1791439339873,"id":"1","total":930,"ms":18869.3301}
+{"_e":"metro:client_log","_t":1791439344799,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791439414337,"id":"3","platform":"android","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1791439414337,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791439414417,"id":"3","total":1,"ms":79.7613}
+{"_e":"metro:client_log","_t":1791439427115,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791439744959,"id":"6","platform":"android","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1791439744959,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791439745017,"id":"6","total":1,"ms":58.4316}
+{"_e":"metro:client_log","_t":1791439752081,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791439906958,"id":"8","platform":"android","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1791439906959,"id":"8","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791439907079,"id":"8","total":1,"ms":120.1241}
+{"_e":"metro:client_log","_t":1791439912821,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791440751802,"id":"a","platform":"android","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1791440751807,"id":"a","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791440751854,"id":"a","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791440753768,"id":"a","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791440754422,"id":"a","total":1,"ms":2616.772}
+{"_e":"metro:client_log","_t":1791440762472,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1791442213973,"id":"c","platform":"android","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1791442213977,"id":"c","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791442214028,"id":"c","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791442215959,"id":"c","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791442216667,"id":"c","total":1,"ms":2692.2384}
+{"_e":"metro:client_log","_t":1791442227625,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791442327797,"level":"error","data":["Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version."]}
+{"_e":"metro:client_log","_t":1791442328548,"level":"error","data":["Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version."]}
+{"_e":"metro:client_log","_t":1791442329599,"level":"error","data":["Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version."]}
+{"_e":"metro:client_log","_t":1791442329810,"level":"error","data":["Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version."]}
+{"_e":"metro:client_log","_t":1791442330043,"level":"error","data":["Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version."]}
+{"_e":"metro:client_log","_t":1791442330394,"level":"error","data":["Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version."]}
+{"_e":"metro:client_log","_t":1791442330862,"level":"error","data":["Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version."]}
+{"_e":"root:init","_t":1791501881482,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791501881484,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791501881487,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791501887199,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791501890306,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791501893177,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791501904545,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"root:init","_t":1791515358848,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791515358849,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791515358853,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791515360186,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791515361119,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791515361676,"plugins":[]}

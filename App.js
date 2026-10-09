@@ -86,7 +86,7 @@ const TYPES = { core: { name: 'Sashibo core', short: 'Core' }, tail: { name: 'Ta
 const other = (t) => (t === 'core' ? 'tail' : 'core');
 const ORIGIN = { model: 'Model', expert: 'Expert', manual: 'Manual override' };
 const QUICK_REASONS = ['Color is clearly darker', 'Color is clearly lighter', 'Model looks wrong for this cut', 'Photo quality was poor', "Matches the buyer's sample"];
-const STEPS = ['Weight', 'Sample', 'Connect', 'Align', 'Capture', 'Result', 'Receipt'];
+const STEPS = ['Details', 'Sample', 'Connect', 'Align', 'Capture', 'Result', 'Receipt'];
 const HERO_SCREENS = ['startup', 'welcome', 'onboarding'];
 /* ====================================================================== */
 /* helpers: money & weight (integer fixed-point)                           */
@@ -482,21 +482,25 @@ const A = {
   hideTips() { S.tips = false; render(); },
   toggleNavDock(v) { S.navDock = v; render(); },
   toggleBatch() { S.ui.batchOpen = !S.ui.batchOpen; render(); },
-  weightNext() {
-    const s = S.session, c = weightCheck(s.weightStr); if (!c.ok || s.grader.trim().length < 2) return;
-    s.grader = s.grader.trim(); S.lastGrader = s.grader;
+   weightNext() {
+    const s = S.session, c = weightCheck(s.weightStr); if (!c.ok) return;
     if (s.editingWeight) {
       s.weightTenths = c.t; s.weightCorrections++; s.editingWeight = false; persist(s);
       go(s.editFrom || 'price'); return;
     }
-    s.weightTenths = c.t; go('sample');
+    s.weightTenths = c.t; go('grader');
+  },
+  graderNext() {
+    const s = S.session; if (s.grader.trim().length < 2) return;
+    s.grader = s.grader.trim(); S.lastGrader = s.grader;
+    go('sample');
   },
   cancelSession() {
     const s = S.session; const has = s && s.captures.length;
     ask('Cancel this session?', has ? 'Saved results stay on this device for review. The weight and any unsaved image are cleared.' : 'The weight and anything entered on this screen will be cleared.', [{ label: 'Keep grading', act: 'closeDialog' }, { label: 'Cancel session', act: 'abandon', kind: 'danger' }]);
   },
   abandon() { abandonSession(); },
-  sampleBack() { const s = S.session; go(s.captures.length ? 'result' : 'weight'); },
+    sampleBack() { const s = S.session; go(s.captures.length ? 'result' : 'grader'); },
   pick(t) {
     const s = S.session;
     if (s.captures.some((c) => c.type === t)) return;
@@ -1011,7 +1015,8 @@ const BODY = { flexGrow: 1, paddingTop: 4, paddingBottom: 10, gap: 10, justifyCo
 
 /* ---------- first-use coach tips (shown once per step, above the buttons) ---------- */
 const COACH = {
-  weight: 'Type your name and the fish weight from your scale. Use kilograms with one decimal.',
+  weight: 'Type the fish weight from your scale. Use kilograms with one decimal.',
+  grader: "Type the grader's name. It goes on the saved record and receipt.",
   sample: 'Tap the cut you placed in the chamber. You can add the other cut afterward.',
   pair: 'Point your phone at the QR code on the kiosk. It connects by itself.',
   align: 'Place the sample in the tray like the picture shows, then tap Looks good.',
@@ -1132,11 +1137,10 @@ screens.weight = () => {
   const selected = s.sampleTypes.length ? s.sampleTypes.map((t) => TYPES[t].name).join(' + ') : 'Not selected yet';
   return (
     <Shell idx={1} left={[backBtn(editing ? 'go' : 'cancelSession', editing ? (s.editFrom || 'price') : ''), helpBtn()]}
-      right={[B(editing ? 'Update price' : 'Continue', 'weightNext', '', 'primary', !chk.ok || s.grader.trim().length < 2, 'arrow')]}>
+      right={[B(editing ? 'Update price' : 'Continue', 'weightNext', '', 'primary', !chk.ok, 'arrow')]}>
       <View style={[BODY, { gap: 22, paddingTop: 20, paddingBottom: 36 }]}>
-        <View style={{ alignItems: 'center', gap: 10, paddingBottom: 4 }}>
-          <Txt k="title" style={{ fontSize: 34, lineHeight: 40, textAlign: 'center' }}>Fish & grader details</Txt>
-          <Sub>Keep the fish information and the person grading it clearly separated.</Sub>
+        <View style={{ alignItems: 'center', paddingBottom: 4 }}>
+          <Txt k="title" style={{ fontSize: 34, lineHeight: 40, textAlign: 'center' }}>Fish details</Txt>
         </View>
 
         <Card lift style={{ gap: 14, paddingVertical: 22, paddingHorizontal: 20 }}>
@@ -1150,9 +1154,9 @@ screens.weight = () => {
             </View>
           </View>
           <View>
-            <KV l="Species" r="Yellowfin tuna" />
-            <KV l="Record" r={s.recordId} />
             <KV l="Weight" r={chk.ok ? fmtKg(chk.t) : 'Enter weight below'} />
+            <KV l="Record" r={s.recordId} />
+            <KV l="Species" r="Yellowfin tuna" />
             <KV l="Selected sample" r={selected} last />
           </View>
           <View style={{ gap: 10, marginTop: 6 }}>
@@ -1171,6 +1175,20 @@ screens.weight = () => {
             {chk.msg ? <Text style={{ color: C.err, fontSize: 13 }}>{chk.msg}</Text> : <Txt k="det">Example: 4.7 for four and seven tenths kilograms.</Txt>}
           </View>
         </Card>
+      </View>
+    </Shell>
+  );
+};
+
+screens.grader = () => {
+  const s = S.session, ts = TS();
+  return (
+    <Shell idx={1} left={[backBtn('go', 'weight'), helpBtn()]}
+      right={[B('Continue', 'graderNext', '', 'primary', s.grader.trim().length < 2, 'arrow')]}>
+      <View style={[BODY, { gap: 22, paddingTop: 20, paddingBottom: 36 }]}>
+        <View style={{ alignItems: 'center', paddingBottom: 4 }}>
+          <Txt k="title" style={{ fontSize: 34, lineHeight: 40, textAlign: 'center' }}>Grader details</Txt>
+        </View>
 
         <Card lift style={{ gap: 16, paddingVertical: 22, paddingHorizontal: 20, borderColor: '#C9D9F7', backgroundColor: '#F8FBFF' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -1190,14 +1208,13 @@ screens.weight = () => {
             style={[st.field, { minHeight: 64, borderRadius: 20, fontSize: 22 * ts, fontWeight: '700', paddingHorizontal: 20, borderColor: C.primary, backgroundColor: '#fff' }]}
             value={s.grader} onChangeText={(v) => { s.grader = v; render(); }}
             placeholder="Enter grader's full name" placeholderTextColor="#8A99AB"
-            autoCapitalize="words" autoCorrect={false} maxLength={40} returnKeyType="next"
+            autoCapitalize="words" autoCorrect={false} maxLength={40} returnKeyType="done"
           />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {chip('Role: Fish grader', 'info', 'check')}
             {chip('Session operator', 'ok')}
           </View>
         </Card>
-
       </View>
     </Shell>
   );
@@ -2145,7 +2162,8 @@ screens.settings = () => (
 /* ====================================================================== */
 const HELP = {
   welcome: 'Press Start grading to begin. Have the fish weight from your scale ready.',
-  weight: "Type the grader's name, then read the weight from the external scale and type it in kilograms with your keyboard. Use one decimal place.",
+  weight: 'Read the weight from the external scale and type it in kilograms with your keyboard. Use one decimal place.',
+  grader: "Type the grader's full name. It is saved on the record and printed on the receipt.",
   sample: 'Choose the type of sample you will place in the chamber. You can add the other type afterward.',
   align: 'The picture shows how the sample sits in the tray. Place the cut face up and inside the dashed outline, then tap Looks good.',
   pair: 'Point your phone camera at the QR code on the kiosk. Allow camera access if asked. Keep the code inside the corners.',
@@ -2182,7 +2200,7 @@ function overlay() {
           <View style={{ gap: 10, width: '100%' }}>
             {rows.map((r, i) => (
               <View key={i} style={{ flexDirection: 'row', gap: 10 }}>
-                {r.map((k, j) => k === '' ? <View key={j} style={{ flex: 1 }} /> : (
+                {r.map((k, j) => k === '' ? <View key={`spacer-${j}`} style={{ flex: 1 }} /> : (
                   <Pressable key={k} onPress={() => act('pinKey', k)} style={({ pressed }) => [st.key, pressed && { backgroundColor: '#E4ECFC', transform: [{ scale: 0.97 }] }]}>
                     {k === 'del' ? <Icon n="backspace" s={32} /> : <Text style={st.keyText}>{k}</Text>}
                   </Pressable>
