@@ -27,6 +27,25 @@ export async function checkPiStatus(apiUrl = PI_CONFIG.apiUrl, attempts = 3) {
 export async function capturePiSnapshot(apiUrl = PI_CONFIG.apiUrl, snapshotUrlOverride = null) {
   const urls = derivePiCameraUrls(apiUrl, null, snapshotUrlOverride);
   const fallbackUrl = piUrl(PI_CONFIG.paths.snapshot, urls.apiUrl);
+  const tryUrls = urls.snapshotUrl !== fallbackUrl ? [urls.snapshotUrl, fallbackUrl] : [urls.snapshotUrl];
+
+  if (Platform.OS !== 'web') {
+    let lastErr;
+    for (const target of tryUrls) {
+      try {
+        const dest = new File(Paths.cache, `pi-snapshot-${Date.now()}.jpg`);
+        const downloaded = await Promise.race([
+          File.downloadFileAsync(target, dest, { idempotent: true }),
+          new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })), PI_CONFIG.snapshotTimeout)),
+        ]);
+        if (downloaded && downloaded.uri) return downloaded.uri;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw new Error(lastErr && lastErr.name === 'AbortError' ? 'Pi camera snapshot timed out.' : 'Cannot reach Raspberry Pi camera.');
+  }
+
   let r;
   try {
     r = await fetchT(urls.snapshotUrl, { cache: 'no-store' }, PI_CONFIG.snapshotTimeout);
@@ -44,29 +63,34 @@ export async function capturePiSnapshot(apiUrl = PI_CONFIG.apiUrl, snapshotUrlOv
   if (!r.ok) throw new Error(`Pi camera snapshot failed (HTTP ${r.status})`);
   const blob = await r.blob();
   if (!blob || blob.size === 0) throw new Error('Pi camera returned an empty image.');
-  if (Platform.OS === 'web') {
-    return URL.createObjectURL(blob);
-  }
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  const file = new File(Paths.cache, `pi-snapshot-${Date.now()}.jpg`);
-  file.write(bytes);
-  return file.uri;
+  return URL.createObjectURL(blob);
 }
 
 export async function gradeWithPi(imageUri, piImageType, apiUrl = PI_CONFIG.apiUrl) {
   const form = new FormData();
   form.append('image_type', piImageType);
-  if (Platform.OS === 'web' || /^(blob:|data:|https?:)/i.test(String(imageUri || ''))) {
-    const imgRes = await fetch(imageUri);
+  const uriStr = String(imageUri || '');
+  if (Platform.OS === 'web' || /^(blob:|data:|https?:)/i.test(uriStr)) {
+    const imgRes = await fetch(uriStr);
     const blob = await imgRes.blob();
     const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
     form.append('image', blob, `capture.${ext}`);
   } else {
-    form.append('image', { uri: imageUri, name: 'capture.jpg', type: 'image/jpeg' });
+    const isPng = /\.png(\?|$)/i.test(uriStr);
+    const isWebp = /\.webp(\?|$)/i.test(uriStr);
+    const ext = isPng ? 'png' : isWebp ? 'webp' : 'jpg';
+    const mime = isPng ? 'image/png' : isWebp ? 'image/webp' : 'image/jpeg';
+    form.append('image', { uri: uriStr, name: `capture.${ext}`, type: mime });
   }
   let r;
-  try { r = await fetchT(piUrl(PI_CONFIG.paths.grade, apiUrl), { method: 'POST', body: form }, PI_CONFIG.inferenceTimeout); }
-  catch (e) { throw new Error(e.name === 'AbortError' ? 'timeout' : 'unreachable'); }
+  try {
+    r = await Promise.race([
+      fetch(piUrl(PI_CONFIG.paths.grade, apiUrl), { method: 'POST', body: form }),
+      new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })), PI_CONFIG.inferenceTimeout)),
+    ]);
+  } catch (e) {
+    throw new Error(e && e.name === 'AbortError' ? 'timeout' : 'unreachable');
+  }
   if (r.status === 422) {
     const body = await r.json().catch(() => ({}));
     const expected = piImageType === 'tailcut' ? 'Tail-Cut' : 'Sashibo Core';

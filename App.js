@@ -2714,8 +2714,66 @@ function PhoneCam({ type }) {
     </>
   );
 }
+function PiLiveStream({ streamUrl, snapshotUrl }) {
+  const baseSnap = snapshotUrl || (streamUrl ? streamUrl.replace(/\/stream(\?.*)?$/i, '/snapshot$1') : '');
+  const [currUri, setCurrUri] = useState(baseSnap ? `${baseSnap}${baseSnap.includes('?') ? '&' : '?'}t=${Date.now()}` : '');
+  const [nextUri, setNextUri] = useState('');
+  const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    if (!baseSnap) return;
+    let alive = true;
+    let timer = null;
+    const queueNext = (delay) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!alive) return;
+        const sep = baseSnap.includes('?') ? '&' : '?';
+        setNextUri(`${baseSnap}${sep}t=${Date.now()}`);
+      }, delay);
+    };
+    setCurrUri(`${baseSnap}${baseSnap.includes('?') ? '&' : '?'}t=${Date.now()}`);
+    queueNext(250);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [baseSnap]);
+
+  const promote = () => {
+    if (nextUri) setCurrUri(nextUri);
+    setLive(true);
+    setTimeout(() => {
+      if (!baseSnap) return;
+      const sep = baseSnap.includes('?') ? '&' : '?';
+      setNextUri(`${baseSnap}${sep}t=${Date.now()}`);
+    }, 180);
+  };
+
+  return (
+    <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#0F1B2B', alignItems: 'center', justifyContent: 'center' }}>
+      {currUri ? <Image source={{ uri: currUri }} style={StyleSheet.absoluteFill} resizeMode="cover" onLoad={() => setLive(true)} /> : null}
+      {nextUri ? <Image source={{ uri: nextUri }} style={[StyleSheet.absoluteFill, { opacity: 0.01 }]} resizeMode="cover" onLoad={promote} onError={() => {
+        setLive(false);
+        setTimeout(() => {
+          if (!baseSnap) return;
+          const sep = baseSnap.includes('?') ? '&' : '?';
+          setNextUri(`${baseSnap}${sep}t=${Date.now()}`);
+        }, 900);
+      }} /> : null}
+      {!live ? (
+        <View style={{ alignItems: 'center', gap: 8 }}>
+          <Spin size={30} bw={3.5} light />
+          <Text style={{ color: 'rgba(255,255,255,0.78)', fontSize: 12.5, fontWeight: '600' }}>Waiting for Pi camera…</Text>
+        </View>
+      ) : null}
+      <Brackets size={170} />
+      <View style={{ position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(15,27,43,0.78)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: live ? C.online : '#E0A100' }} />
+        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{`RPi Camera · ${(baseSnap || '').replace(/^https?:\/\//, '')}`}</Text>
+      </View>
+    </View>
+  );
+}
 const camView = (t) => {
-  const showPiStream = !S.demo.enabled && S.camSource === 'pi' && S.phoneLinked && S.piStreamUrl;
+  const showPiStream = !S.demo.enabled && S.camSource === 'pi' && S.phoneLinked && (S.piSnapshotUrl || S.piStreamUrl);
   const demoCode = S.demo.queue.length ? S.demo.queue[0] : S.demo.next;
   return (
     <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>
@@ -2729,14 +2787,7 @@ const camView = (t) => {
           </View>
         </View>
       ) : showPiStream ? (
-        <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#0F1B2B', alignItems: 'center', justifyContent: 'center' }}>
-          <Image source={{ uri: S.piStreamUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          <Brackets size={170} />
-          <View style={{ position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(15,27,43,0.75)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.online }} />
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{`RPi Stream · ${S.piStreamUrl.replace(/^https?:\/\//, '')}`}</Text>
-          </View>
-        </View>
+        <PiLiveStream streamUrl={S.piStreamUrl} snapshotUrl={S.piSnapshotUrl} />
       ) : (
         <PhoneCam type={t} />
       )}

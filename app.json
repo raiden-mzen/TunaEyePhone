@@ -39,8 +39,7 @@
         {
           "photosPermission": "TunaEye lets you choose a photo of the sample from your gallery."
         }
-      ],
-      "expo-build-properties"
+      ]
     ],
     "android": {
       "package": "com.yourname.tunaeyekiosk",
