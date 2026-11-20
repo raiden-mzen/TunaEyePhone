@@ -460,3 +460,539 @@
 {"_e":"metro:client_log","_t":1795179132752,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
 {"_e":"metro:client_log","_t":1795179132753,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
 {"_e":"metro:client_log","_t":1795179132753,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"root:init","_t":1795187998941,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1795187998945,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1795187998955,"mode":"development","files":["../..\\..\\.env"],"env":{"EXPO_PUBLIC_PI_API_URL":"http://127.0.0.1:3000","EXPO_PUBLIC_SUPABASE_ANON_KEY":"sb_publishable_fCSS9qu_SIDZPxklimXQuQ_dz3dlTM3","EXPO_PUBLIC_SUPABASE_URL":"https://wafhvgwujqgkxffvrvvl.supabase.co"}}
+{"_e":"devserver:start","_t":1795188001613,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1795188004055,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1795188006169,"plugins":[]}
+{"_e":"metro:instantiate","_t":1795188015091,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1795188030447,"id":"1","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795188030448,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795188030454,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795188033042,"id":"1","progress":0.010000000000000002,"total":1,"current":1}
+{"_e":"metro:bundling:progress","_t":1795188033144,"id":"1","progress":0.010000000000000002,"total":3,"current":1}
+{"_e":"metro:bundling:progress","_t":1795188033492,"id":"1","progress":0.04000000000000001,"total":3,"current":2}
+{"_e":"metro:bundling:progress","_t":1795188033594,"id":"1","progress":0.1322314049586777,"total":11,"current":4}
+{"_e":"metro:bundling:progress","_t":1795188033720,"id":"1","progress":0.20661157024793386,"total":11,"current":5}
+{"_e":"metro:bundling:progress","_t":1795188034917,"id":"1","progress":0.29752066115702475,"total":11,"current":6}
+{"_e":"metro:bundling:progress","_t":1795188035018,"id":"1","progress":0.29752066115702475,"total":22,"current":11}
+{"_e":"metro:bundling:progress","_t":1795188035118,"id":"1","progress":0.3964334705075446,"total":27,"current":17}
+{"_e":"metro:bundling:progress","_t":1795188035219,"id":"1","progress":0.5406574394463669,"total":34,"current":25}
+{"_e":"metro:bundling:progress","_t":1795188035321,"id":"1","progress":0.571683521713266,"total":41,"current":31}
+{"_e":"metro:bundling:progress","_t":1795188035423,"id":"1","progress":0.571683521713266,"total":54,"current":37}
+{"_e":"metro:bundling:progress","_t":1795188035523,"id":"1","progress":0.5831404958677686,"total":55,"current":42}
+{"_e":"metro:bundling:progress","_t":1795188035646,"id":"1","progress":0.6246097814776275,"total":62,"current":49}
+{"_e":"metro:bundling:progress","_t":1795188035751,"id":"1","progress":0.6246097814776275,"total":75,"current":57}
+{"_e":"metro:bundling:progress","_t":1795188035855,"id":"1","progress":0.6246097814776275,"total":83,"current":62}
+{"_e":"metro:bundling:progress","_t":1795188035953,"id":"1","progress":0.72052460789616,"total":86,"current":73}
+{"_e":"metro:bundling:progress","_t":1795188036055,"id":"1","progress":0.81,"total":90,"current":81}
+{"_e":"metro:bundling:progress","_t":1795188036157,"id":"1","progress":0.81,"total":103,"current":88}
+{"_e":"metro:bundling:progress","_t":1795188036259,"id":"1","progress":0.8373976504093984,"total":106,"current":97}
+{"_e":"metro:bundling:progress","_t":1795188036361,"id":"1","progress":0.8373976504093984,"total":121,"current":107}
+{"_e":"metro:bundling:progress","_t":1795188036474,"id":"1","progress":0.9510279352503244,"total":121,"current":118}
+{"_e":"metro:bundling:progress","_t":1795188037074,"id":"1","progress":0.9672153541424767,"total":121,"current":119}
+{"_e":"metro:bundling:progress","_t":1795188037402,"id":"1","progress":0.9672153541424767,"total":122,"current":119}
+{"_e":"metro:bundling:progress","_t":1795188037502,"id":"1","progress":0.9672153541424767,"total":159,"current":120}
+{"_e":"metro:bundling:progress","_t":1795188037577,"id":"1","progress":0.9672153541424767,"total":159,"current":121}
+{"_e":"metro:bundling:progress","_t":1795188037680,"id":"1","progress":0.9672153541424767,"total":169,"current":130}
+{"_e":"metro:bundling:progress","_t":1795188037783,"id":"1","progress":0.9672153541424767,"total":195,"current":142}
+{"_e":"metro:bundling:progress","_t":1795188037885,"id":"1","progress":0.9672153541424767,"total":199,"current":148}
+{"_e":"metro:bundling:progress","_t":1795188037994,"id":"1","progress":0.9672153541424767,"total":223,"current":166}
+{"_e":"metro:bundling:progress","_t":1795188038095,"id":"1","progress":0.9672153541424767,"total":235,"current":182}
+{"_e":"metro:bundling:progress","_t":1795188038196,"id":"1","progress":0.9672153541424767,"total":272,"current":191}
+{"_e":"metro:bundling:progress","_t":1795188038305,"id":"1","progress":0.9672153541424767,"total":287,"current":201}
+{"_e":"metro:bundling:progress","_t":1795188038429,"id":"1","progress":0.9672153541424767,"total":293,"current":212}
+{"_e":"metro:bundling:progress","_t":1795188038529,"id":"1","progress":0.9672153541424767,"total":320,"current":223}
+{"_e":"metro:bundling:progress","_t":1795188038634,"id":"1","progress":0.9672153541424767,"total":328,"current":234}
+{"_e":"metro:bundling:progress","_t":1795188038827,"id":"1","progress":0.9672153541424767,"total":339,"current":253}
+{"_e":"metro:bundling:progress","_t":1795188038927,"id":"1","progress":0.9672153541424767,"total":356,"current":275}
+{"_e":"metro:bundling:progress","_t":1795188039035,"id":"1","progress":0.9672153541424767,"total":383,"current":291}
+{"_e":"metro:bundling:progress","_t":1795188039144,"id":"1","progress":0.9672153541424767,"total":385,"current":304}
+{"_e":"metro:bundling:progress","_t":1795188039248,"id":"1","progress":0.9672153541424767,"total":389,"current":317}
+{"_e":"metro:bundling:progress","_t":1795188039348,"id":"1","progress":0.9672153541424767,"total":398,"current":342}
+{"_e":"metro:bundling:progress","_t":1795188039460,"id":"1","progress":0.9672153541424767,"total":405,"current":358}
+{"_e":"metro:bundling:progress","_t":1795188039563,"id":"1","progress":0.9672153541424767,"total":413,"current":370}
+{"_e":"metro:bundling:progress","_t":1795188039665,"id":"1","progress":0.9672153541424767,"total":425,"current":381}
+{"_e":"metro:bundling:progress","_t":1795188039765,"id":"1","progress":0.9672153541424767,"total":439,"current":393}
+{"_e":"metro:bundling:progress","_t":1795188039865,"id":"1","progress":0.9672153541424767,"total":449,"current":408}
+{"_e":"metro:bundling:progress","_t":1795188039969,"id":"1","progress":0.9672153541424767,"total":450,"current":424}
+{"_e":"metro:bundling:progress","_t":1795188040070,"id":"1","progress":0.9672153541424767,"total":455,"current":441}
+{"_e":"metro:bundling:progress","_t":1795188040176,"id":"1","progress":0.9672153541424767,"total":459,"current":450}
+{"_e":"metro:bundling:progress","_t":1795188040298,"id":"1","progress":0.9672153541424767,"total":475,"current":460}
+{"_e":"metro:bundling:progress","_t":1795188040412,"id":"1","progress":0.9792321337511604,"total":479,"current":474}
+{"_e":"metro:bundling:progress","_t":1795188040516,"id":"1","progress":0.999,"total":480,"current":480}
+{"_e":"metro:bundling:done","_t":1795188040744,"id":"1","total":480,"ms":10296.8464}
+{"_e":"metro:client_log","_t":1795188041017,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795188041018,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795188041019,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795188041019,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795188041020,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795188045171,"level":"warn","data":["Cannot record touch end without a touch start.\n","Touch End: {\"identifier\":0,\"pageX\":1348,\"pageY\":922,\"timestamp\":14791.700000000186}\n","Touch Bank: []"]}
+{"_e":"metro:bundling:started","_t":1795188117347,"id":"d","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188119149,"id":"f","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188120820,"id":"g","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188122976,"id":"h","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188125268,"id":"i","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188126978,"id":"j","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188128680,"id":"k","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"root:init","_t":1795188163505,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1795188163514,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1795188163521,"mode":"development","files":["../..\\..\\.env"],"env":{"EXPO_PUBLIC_PI_API_URL":"http://127.0.0.1:3000","EXPO_PUBLIC_SUPABASE_ANON_KEY":"sb_publishable_fCSS9qu_SIDZPxklimXQuQ_dz3dlTM3","EXPO_PUBLIC_SUPABASE_URL":"https://wafhvgwujqgkxffvrvvl.supabase.co"}}
+{"_e":"metro:bundling:started","_t":1795188278573,"id":"l","platform":"web","environment":null,"entry":"src\\pi\\config.js"}
+{"_e":"metro:bundling:started","_t":1795188280671,"id":"m","platform":"web","environment":null,"entry":"src\\pi\\client.js"}
+{"_e":"metro:bundling:started","_t":1795188282709,"id":"n","platform":"web","environment":null,"entry":"src\\pi\\client.js"}
+{"_e":"metro:bundling:started","_t":1795188325603,"id":"o","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188328875,"id":"p","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188331688,"id":"q","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188332953,"id":"r","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188335574,"id":"s","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188338334,"id":"t","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188339271,"id":"u","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188358904,"id":"v","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188360739,"id":"w","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188590711,"id":"x","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795188590711,"id":"x","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795188590751,"id":"x","total":1,"ms":40.4096}
+{"_e":"metro:client_log","_t":1795188591061,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795188591061,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795188591062,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795188591062,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795188591062,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795188594170,"id":"12","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795188594170,"id":"12","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795188594226,"id":"12","total":1,"ms":56.0269}
+{"_e":"metro:client_log","_t":1795188594568,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795188594568,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795188594568,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795188594569,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795188594571,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795188828802,"id":"1h","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188830611,"id":"1k","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188832742,"id":"1l","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188834926,"id":"1m","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188837218,"id":"1n","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188839202,"id":"1o","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188841875,"id":"1p","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188852873,"id":"1q","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188854810,"id":"1r","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795188990343,"id":"1s","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795188990344,"id":"1s","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795188990374,"id":"1s","total":1,"ms":30.2449}
+{"_e":"metro:client_log","_t":1795188990632,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795188990632,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795188990632,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795188990632,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795188990632,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795189014393,"id":"1z","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:progress","_t":1795189014393,"id":"1z","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795189014397,"id":"1z","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795189014502,"id":"1z","progress":0.04000000000000001,"total":4,"current":2}
+{"_e":"metro:bundling:progress","_t":1795189014603,"id":"1z","progress":0.09,"total":4,"current":3}
+{"_e":"metro:bundling:progress","_t":1795189014960,"id":"1z","progress":0.16000000000000003,"total":4,"current":4}
+{"_e":"metro:bundling:done","_t":1795189014976,"id":"1z","total":4,"ms":583.2895}
+{"_e":"metro:bundling:started","_t":1795189014994,"id":"20","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:started","_t":1795189049743,"id":"21","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189050413,"id":"23","platform":"web","environment":null,"entry":"src\\pi\\config.js"}
+{"_e":"metro:bundling:started","_t":1795189130166,"id":"26","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189131984,"id":"28","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189216112,"id":"29","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189217792,"id":"2a","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189219858,"id":"2b","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189221827,"id":"2c","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189223541,"id":"2d","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189252154,"id":"2e","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189623339,"id":"2f","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795189623353,"id":"2f","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795189623710,"id":"2f","total":1,"ms":363.1538}
+{"_e":"metro:bundling:started","_t":1795189623857,"id":"2g","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795189623859,"id":"2g","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795189623934,"id":"2g","total":1,"ms":76.4263}
+{"_e":"metro:client_log","_t":1795189624013,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795189624018,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795189624018,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795189624018,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795189624027,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795189624937,"id":"2k","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795189624937,"id":"2k","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795189624991,"id":"2k","total":1,"ms":53.8144}
+{"_e":"metro:client_log","_t":1795189625306,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795189625306,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795189625306,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795189625306,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795189625307,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795189625799,"id":"2o","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795189625799,"id":"2o","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795189625840,"id":"2o","total":1,"ms":41.4479}
+{"_e":"metro:bundling:started","_t":1795189632868,"id":"2p","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795189632868,"id":"2p","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795189632899,"id":"2p","total":1,"ms":30.4387}
+{"_e":"metro:client_log","_t":1795189633298,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795189633308,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795189633308,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795189633308,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795189633308,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795189716429,"id":"2x","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189718743,"id":"2z","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189722070,"id":"30","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189723766,"id":"31","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189848896,"id":"32","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189850870,"id":"33","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189852961,"id":"34","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189855886,"id":"35","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795189858491,"id":"36","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795190048480,"id":"37","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795190048480,"id":"37","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795190048552,"id":"37","total":1,"ms":71.4702}
+{"_e":"metro:client_log","_t":1795190048833,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795190048833,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795190048833,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795190048833,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795190048833,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795190075697,"id":"3e","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:progress","_t":1795190075697,"id":"3e","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795190075710,"id":"3e","total":1,"ms":12.5471}
+{"_e":"metro:bundling:started","_t":1795190075825,"id":"3f","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:started","_t":1795190178352,"id":"3i","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795190180273,"id":"3j","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795190182456,"id":"3k","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795190184455,"id":"3l","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795190600144,"id":"3o","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795190600144,"id":"3o","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795190600172,"id":"3o","total":1,"ms":27.8779}
+{"_e":"metro:client_log","_t":1795190600430,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795190600431,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795190600431,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:client_log","_t":1795190600431,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795190600438,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795190839753,"id":"3y","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795190841494,"id":"3z","platform":"web","environment":null,"entry":"App.js"}
+{"_e":"metro:bundling:started","_t":1795190949295,"id":"40","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795190949296,"id":"40","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795190949328,"id":"40","total":1,"ms":32.3462}
+{"_e":"metro:client_log","_t":1795190949559,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795190949560,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795190949560,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795190949560,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795190960177,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"root:init","_t":1795191042912,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1795191042914,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1795191042921,"mode":"development","files":["../..\\..\\.env"],"env":{"EXPO_PUBLIC_PI_API_URL":"http://10.42.0.1:5000","EXPO_PUBLIC_SUPABASE_ANON_KEY":"sb_publishable_fCSS9qu_SIDZPxklimXQuQ_dz3dlTM3","EXPO_PUBLIC_SUPABASE_URL":"https://wafhvgwujqgkxffvrvvl.supabase.co"}}
+{"_e":"devserver:start","_t":1795191044119,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1795191045784,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1795191047457,"plugins":[]}
+{"_e":"metro:instantiate","_t":1795191056241,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"root:init","_t":1795191806879,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1795191806881,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1795191806887,"mode":"development","files":["../..\\..\\.env"],"env":{"EXPO_PUBLIC_PI_API_URL":"http://10.42.0.1:5000","EXPO_PUBLIC_SUPABASE_ANON_KEY":"sb_publishable_fCSS9qu_SIDZPxklimXQuQ_dz3dlTM3","EXPO_PUBLIC_SUPABASE_URL":"https://wafhvgwujqgkxffvrvvl.supabase.co"}}
+{"_e":"devserver:start","_t":1795191807904,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1795191808722,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1795191809112,"plugins":[]}
+{"_e":"metro:instantiate","_t":1795191816659,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1795191819726,"id":"1","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795191819726,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795191819759,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795191821191,"id":"1","progress":0.010000000000000002,"total":1,"current":1}
+{"_e":"metro:bundling:progress","_t":1795191821291,"id":"1","progress":0.010000000000000002,"total":3,"current":1}
+{"_e":"metro:bundling:progress","_t":1795191822882,"id":"1","progress":0.04000000000000001,"total":3,"current":2}
+{"_e":"metro:bundling:progress","_t":1795191823217,"id":"1","progress":0.04000000000000001,"total":4,"current":2}
+{"_e":"metro:bundling:progress","_t":1795191823329,"id":"1","progress":0.04000000000000001,"total":53,"current":3}
+{"_e":"metro:bundling:progress","_t":1795191825666,"id":"1","progress":0.04000000000000001,"total":53,"current":4}
+{"_e":"metro:bundling:progress","_t":1795191825769,"id":"1","progress":0.04000000000000001,"total":60,"current":7}
+{"_e":"metro:bundling:progress","_t":1795191825899,"id":"1","progress":0.04000000000000001,"total":72,"current":9}
+{"_e":"metro:bundling:progress","_t":1795191826004,"id":"1","progress":0.04000000000000001,"total":79,"current":12}
+{"_e":"metro:bundling:progress","_t":1795191826123,"id":"1","progress":0.04000000000000001,"total":86,"current":14}
+{"_e":"metro:bundling:progress","_t":1795191826225,"id":"1","progress":0.04000000000000001,"total":96,"current":19}
+{"_e":"metro:bundling:progress","_t":1795191826338,"id":"1","progress":0.053254437869822494,"total":104,"current":24}
+{"_e":"metro:bundling:progress","_t":1795191826450,"id":"1","progress":0.06471221914435211,"total":114,"current":29}
+{"_e":"metro:bundling:progress","_t":1795191826551,"id":"1","progress":0.10534010464758388,"total":114,"current":37}
+{"_e":"metro:bundling:progress","_t":1795191826671,"id":"1","progress":0.13109393579072534,"total":116,"current":42}
+{"_e":"metro:bundling:progress","_t":1795191826788,"id":"1","progress":0.16399153063315347,"total":121,"current":49}
+{"_e":"metro:bundling:progress","_t":1795191826892,"id":"1","progress":0.19591507659231389,"total":122,"current":54}
+{"_e":"metro:bundling:progress","_t":1795191827020,"id":"1","progress":0.20070400000000002,"total":125,"current":56}
+{"_e":"metro:bundling:progress","_t":1795191827130,"id":"1","progress":0.207936,"total":125,"current":57}
+{"_e":"metro:bundling:progress","_t":1795191827237,"id":"1","progress":0.2307024614049228,"total":127,"current":61}
+{"_e":"metro:bundling:progress","_t":1795191827337,"id":"1","progress":0.27398681640625,"total":128,"current":67}
+{"_e":"metro:bundling:progress","_t":1795191827439,"id":"1","progress":0.27398681640625,"total":136,"current":71}
+{"_e":"metro:bundling:progress","_t":1795191827539,"id":"1","progress":0.3104081632653061,"total":140,"current":78}
+{"_e":"metro:bundling:progress","_t":1795191827641,"id":"1","progress":0.32213294375456536,"total":148,"current":84}
+{"_e":"metro:bundling:progress","_t":1795191827748,"id":"1","progress":0.32213294375456536,"total":177,"current":91}
+{"_e":"metro:bundling:progress","_t":1795191827850,"id":"1","progress":0.32213294375456536,"total":191,"current":98}
+{"_e":"metro:bundling:progress","_t":1795191827960,"id":"1","progress":0.32213294375456536,"total":198,"current":104}
+{"_e":"metro:bundling:progress","_t":1795191828067,"id":"1","progress":0.32213294375456536,"total":199,"current":109}
+{"_e":"metro:bundling:progress","_t":1795191828174,"id":"1","progress":0.32213294375456536,"total":205,"current":115}
+{"_e":"metro:bundling:progress","_t":1795191828274,"id":"1","progress":0.32213294375456536,"total":214,"current":119}
+{"_e":"metro:bundling:progress","_t":1795191828383,"id":"1","progress":0.3511659807956104,"total":216,"current":128}
+{"_e":"metro:bundling:progress","_t":1795191828498,"id":"1","progress":0.37314960791138596,"total":221,"current":135}
+{"_e":"metro:bundling:progress","_t":1795191828602,"id":"1","progress":0.39198487712665414,"total":230,"current":144}
+{"_e":"metro:bundling:progress","_t":1795191828703,"id":"1","progress":0.4117361111111112,"total":240,"current":154}
+{"_e":"metro:bundling:progress","_t":1795191828804,"id":"1","progress":0.4648760330578512,"total":242,"current":165}
+{"_e":"metro:bundling:progress","_t":1795191828907,"id":"1","progress":0.5151534859521333,"total":248,"current":178}
+{"_e":"metro:bundling:progress","_t":1795191829010,"id":"1","progress":0.5373882954238822,"total":251,"current":184}
+{"_e":"metro:bundling:progress","_t":1795191829111,"id":"1","progress":0.5695977216091136,"total":265,"current":200}
+{"_e":"metro:bundling:progress","_t":1795191829222,"id":"1","progress":0.5695977216091136,"total":286,"current":209}
+{"_e":"metro:bundling:progress","_t":1795191829322,"id":"1","progress":0.5695977216091136,"total":296,"current":221}
+{"_e":"metro:bundling:progress","_t":1795191829423,"id":"1","progress":0.603211111111111,"total":300,"current":233}
+{"_e":"metro:bundling:progress","_t":1795191829524,"id":"1","progress":0.6256759131936187,"total":311,"current":246}
+{"_e":"metro:bundling:progress","_t":1795191829623,"id":"1","progress":0.6595408631772268,"total":330,"current":268}
+{"_e":"metro:bundling:progress","_t":1795191829723,"id":"1","progress":0.6854071093344135,"total":337,"current":279}
+{"_e":"metro:bundling:progress","_t":1795191829829,"id":"1","progress":0.7055999999999999,"total":350,"current":294}
+{"_e":"metro:bundling:progress","_t":1795191829930,"id":"1","progress":0.7326601238480368,"total":361,"current":309}
+{"_e":"metro:bundling:progress","_t":1795191830030,"id":"1","progress":0.7326601238480368,"total":386,"current":326}
+{"_e":"metro:bundling:progress","_t":1795191830135,"id":"1","progress":0.7326601238480368,"total":392,"current":335}
+{"_e":"metro:bundling:progress","_t":1795191830238,"id":"1","progress":0.7618111827662764,"total":401,"current":350}
+{"_e":"metro:bundling:progress","_t":1795191830342,"id":"1","progress":0.8215681040549394,"total":406,"current":368}
+{"_e":"metro:bundling:progress","_t":1795191830444,"id":"1","progress":0.8256722737469081,"total":427,"current":388}
+{"_e":"metro:bundling:progress","_t":1795191830545,"id":"1","progress":0.8321821546864083,"total":433,"current":395}
+{"_e":"metro:bundling:progress","_t":1795191830651,"id":"1","progress":0.8321821546864083,"total":453,"current":407}
+{"_e":"metro:bundling:progress","_t":1795191830774,"id":"1","progress":0.860794162289501,"total":457,"current":424}
+{"_e":"metro:bundling:progress","_t":1795191830876,"id":"1","progress":0.9027060855162549,"total":461,"current":438}
+{"_e":"metro:bundling:progress","_t":1795191830983,"id":"1","progress":0.9532477743091686,"total":465,"current":454}
+{"_e":"metro:bundling:progress","_t":1795191831092,"id":"1","progress":0.9745233399079554,"total":468,"current":462}
+{"_e":"metro:bundling:progress","_t":1795191831200,"id":"1","progress":0.9873017160939592,"total":471,"current":468}
+{"_e":"metro:bundling:progress","_t":1795191831304,"id":"1","progress":0.9873017160939592,"total":483,"current":476}
+{"_e":"metro:bundling:progress","_t":1795191831418,"id":"1","progress":0.9958634997792437,"total":483,"current":482}
+{"_e":"metro:bundling:progress","_t":1795191832936,"id":"1","progress":0.999,"total":483,"current":483}
+{"_e":"metro:bundling:progress","_t":1795191833048,"id":"1","progress":0.999,"total":487,"current":487}
+{"_e":"metro:bundling:done","_t":1795191833291,"id":"1","total":487,"ms":13565.0048}
+{"_e":"metro:client_log","_t":1795191833680,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795191833683,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795191833690,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795191833691,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795192037980,"id":"8","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795192037981,"id":"8","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795192038021,"id":"8","total":1,"ms":40.7705}
+{"_e":"metro:client_log","_t":1795192038358,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795192038358,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795192038359,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795192038361,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795192048387,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795192058908,"id":"f","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:progress","_t":1795192058909,"id":"f","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795192058910,"id":"f","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795192059025,"id":"f","progress":0.09,"total":4,"current":3}
+{"_e":"metro:bundling:progress","_t":1795192059395,"id":"f","progress":0.16000000000000003,"total":4,"current":4}
+{"_e":"metro:bundling:done","_t":1795192059414,"id":"f","total":4,"ms":505.1331}
+{"_e":"metro:bundling:started","_t":1795192059451,"id":"g","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:started","_t":1795192289961,"id":"h","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795192289961,"id":"h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795192290003,"id":"h","total":1,"ms":41.8467}
+{"_e":"metro:client_log","_t":1795192290336,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795192290336,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795192290336,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795192290347,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795192364975,"id":"l","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795192364976,"id":"l","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795192365017,"id":"l","total":1,"ms":41.3509}
+{"_e":"metro:client_log","_t":1795192365332,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795192365332,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795192365332,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795192365344,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795192448185,"id":"p","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795192448185,"id":"p","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795192448227,"id":"p","total":1,"ms":41.4723}
+{"_e":"metro:client_log","_t":1795192448546,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795192448547,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795192448547,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795192448568,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795192471903,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795192533819,"id":"y","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795192533819,"id":"y","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795192533867,"id":"y","total":1,"ms":48.1032}
+{"_e":"metro:client_log","_t":1795192534273,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795192534273,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795192534273,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795192534287,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795192557568,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795196390836,"id":"17","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795196390907,"id":"17","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795196393682,"id":"17","total":1,"ms":2805.3799}
+{"_e":"metro:client_log","_t":1795196395584,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795196395585,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795196395585,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795196395591,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795196432891,"id":"1b","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795196432891,"id":"1b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795196432988,"id":"1b","total":1,"ms":96.9397}
+{"_e":"metro:bundling:started","_t":1795197465578,"id":"1e","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795197465591,"id":"1e","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795197465842,"id":"1e","total":1,"ms":255.4559}
+{"_e":"metro:client_log","_t":1795197466208,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795197466213,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795197466216,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795197470246,"id":"1j","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795197470246,"id":"1j","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795197470409,"id":"1j","total":1,"ms":163.2153}
+{"_e":"metro:client_log","_t":1795197471641,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795197471641,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795197471643,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795197539187,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795197539543,"id":"1v","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:progress","_t":1795197539543,"id":"1v","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795197539552,"id":"1v","total":1,"ms":9.0681}
+{"_e":"metro:bundling:started","_t":1795198110387,"id":"24","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795198110387,"id":"24","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795198110544,"id":"24","total":1,"ms":156.9332}
+{"_e":"metro:client_log","_t":1795198110894,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795198110895,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795198110895,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795198121158,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:failed","_t":1795198276360,"id":null,"message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Unexpected token (3923:2)\n\n  3921 | /** Load locally persisted records. Real records survive restarts; demo fixtures are never synced. */\n  3922 | async function hydrateRecords() {\n> 3923 |   try {\n       |   ^\n  3924 |     const savedPiUrl = normalizePiUrl(await AsyncStorage.getItem(PI_URL_STORAGE_KEY));\n  3925 |     if (savedPiUrl && /^https?:\\/\\//i.test(savedPiUrl)) {\n  3926 |       S.piApiUrl = savedPiUrl;","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:client_log","_t":1795198276377,"level":"error","data":["[TransformError: SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Unexpected token (3923:2)\n\n  3921 | /** Load locally persisted records. Real records survive restarts; demo fixtures are never synced. */\n  3922 | async function hydrateRecords() {\n> 3923 |   try {\n       |   ^\n  3924 |     const savedPiUrl = normalizePiUrl(await AsyncStorage.getItem(PI_URL_STORAGE_KEY));\n  3925 |     if (savedPiUrl && /^https?:\\/\\//i.test(savedPiUrl)) {\n  3926 |       S.piApiUrl = savedPiUrl;]"]}
+{"_e":"metro:bundling:failed","_t":1795198276679,"id":null,"message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Unexpected token (3923:2)\n\n  3921 | /** Load locally persisted records. Real records survive restarts; demo fixtures are never synced. */\n  3922 | async function hydrateRecords() {\n> 3923 |   try {\n       |   ^\n  3924 |     const savedPiUrl = normalizePiUrl(await AsyncStorage.getItem(PI_URL_STORAGE_KEY));\n  3925 |     if (savedPiUrl && /^https?:\\/\\//i.test(savedPiUrl)) {\n  3926 |       S.piApiUrl = savedPiUrl;","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:client_log","_t":1795198276680,"level":"error","data":["[TransformError: SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Unexpected token (3923:2)\n\n  3921 | /** Load locally persisted records. Real records survive restarts; demo fixtures are never synced. */\n  3922 | async function hydrateRecords() {\n> 3923 |   try {\n       |   ^\n  3924 |     const savedPiUrl = normalizePiUrl(await AsyncStorage.getItem(PI_URL_STORAGE_KEY));\n  3925 |     if (savedPiUrl && /^https?:\\/\\//i.test(savedPiUrl)) {\n  3926 |       S.piApiUrl = savedPiUrl;]"]}
+{"_e":"metro:bundling:started","_t":1795199287712,"id":"2h","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795199287712,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199287714,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199287814,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199287862,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199287964,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199288064,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199288164,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199288449,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199288461,"id":"2h","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795199288557,"id":"2h","total":1,"ms":844.8788}
+{"_e":"metro:client_log","_t":1795199288776,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795199288777,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795199288777,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:started","_t":1795199365136,"id":"2o","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795199365136,"id":"2o","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795199365174,"id":"2o","total":1,"ms":37.8866}
+{"_e":"metro:client_log","_t":1795199365399,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795199365399,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795199365400,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795199374949,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795199382289,"id":"2z","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:progress","_t":1795199382289,"id":"2z","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795199382289,"id":"2z","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795199382302,"id":"2z","total":1,"ms":13.4275}
+{"_e":"metro:bundling:started","_t":1795200725649,"id":"37","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795200725650,"id":"37","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795200725706,"id":"37","total":1,"ms":56.7255}
+{"_e":"metro:client_log","_t":1795200725971,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795200725971,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795200725971,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795200735170,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795200740646,"id":"3i","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:progress","_t":1795200740646,"id":"3i","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795200740653,"id":"3i","total":1,"ms":6.205}
+{"_e":"metro:bundling:started","_t":1795201664507,"id":"3n","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795201664508,"id":"3n","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795201664550,"id":"3n","total":1,"ms":42.2081}
+{"_e":"metro:client_log","_t":1795201664795,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795201664795,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795201664795,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795201671361,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795201875509,"id":"41","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795201875509,"id":"41","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795201875537,"id":"41","total":1,"ms":28.1576}
+{"_e":"metro:client_log","_t":1795201875813,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795201875813,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795201875814,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795201885025,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795201891175,"id":"4e","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:progress","_t":1795201891175,"id":"4e","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795201891180,"id":"4e","total":1,"ms":4.5049}
+{"_e":"metro:bundling:failed","_t":1795201922095,"id":null,"message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Expected corresponding JSX closing tag for <Card>. (3212:26)\n\n  3210 |                               {fg ? <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a=\"override\" icon=\"edit\" /> : null}\n  3211 |                             </View>\n> 3212 |                           </Shell>\n       |                           ^\n  3213 |                           );\n  3214 | };\n  3215 |","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:client_log","_t":1795201922100,"level":"error","data":["[TransformError: SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Expected corresponding JSX closing tag for <Card>. (3212:26)\n\n  3210 |                               {fg ? <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a=\"override\" icon=\"edit\" /> : null}\n  3211 |                             </View>\n> 3212 |                           </Shell>\n       |                           ^\n  3213 |                           );\n  3214 | };\n  3215 |]"]}
+{"_e":"metro:bundling:started","_t":1795201931425,"id":"4f","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795201931425,"id":"4f","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795201931425,"id":"4f","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:failed","_t":1795201931663,"id":"4f","message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Expected corresponding JSX closing tag for <Card>. (3212:26)\n\n  3210 |                               {fg ? <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a=\"override\" icon=\"edit\" /> : null}\n  3211 |                             </View>\n> 3212 |                           </Shell>\n       |                           ^\n  3213 |                           );\n  3214 | };\n  3215 |","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:bundling:started","_t":1795201934013,"id":"4j","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795201934013,"id":"4j","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795201934013,"id":"4j","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:failed","_t":1795201934153,"id":"4j","message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Expected corresponding JSX closing tag for <Card>. (3212:26)\n\n  3210 |                               {fg ? <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a=\"override\" icon=\"edit\" /> : null}\n  3211 |                             </View>\n> 3212 |                           </Shell>\n       |                           ^\n  3213 |                           );\n  3214 | };\n  3215 |","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:bundling:started","_t":1795201935027,"id":"4o","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795201935027,"id":"4o","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795201935028,"id":"4o","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:failed","_t":1795201935154,"id":"4o","message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Expected corresponding JSX closing tag for <Card>. (3212:26)\n\n  3210 |                               {fg ? <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a=\"override\" icon=\"edit\" /> : null}\n  3211 |                             </View>\n> 3212 |                           </Shell>\n       |                           ^\n  3213 |                           );\n  3214 | };\n  3215 |","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:bundling:started","_t":1795201971408,"id":"4x","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795201971408,"id":"4x","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795201971409,"id":"4x","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:failed","_t":1795201971596,"id":"4x","message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Expected corresponding JSX closing tag for <Card>. (3212:26)\n\n  3210 |                               {fg ? <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a=\"override\" icon=\"edit\" /> : null}\n  3211 |                             </View>\n> 3212 |                           </Shell>\n       |                           ^\n  3213 |                           );\n  3214 | };\n  3215 |","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:bundling:started","_t":1795202014788,"id":"4z","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795202014788,"id":"4z","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202014792,"id":"4z","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202014908,"id":"4z","progress":0.010000000000000002,"total":3,"current":1}
+{"_e":"metro:bundling:progress","_t":1795202015266,"id":"4z","progress":0.04000000000000001,"total":3,"current":2}
+{"_e":"metro:bundling:progress","_t":1795202015374,"id":"4z","progress":0.20661157024793386,"total":11,"current":5}
+{"_e":"metro:bundling:progress","_t":1795202015474,"id":"4z","progress":0.34602076124567477,"total":17,"current":10}
+{"_e":"metro:bundling:progress","_t":1795202015574,"id":"4z","progress":0.34602076124567477,"total":21,"current":11}
+{"_e":"metro:bundling:progress","_t":1795202015680,"id":"4z","progress":0.4096,"total":25,"current":16}
+{"_e":"metro:bundling:progress","_t":1795202015818,"id":"4z","progress":0.5340236686390532,"total":26,"current":19}
+{"_e":"metro:bundling:progress","_t":1795202015921,"id":"4z","progress":0.591715976331361,"total":26,"current":20}
+{"_e":"metro:bundling:progress","_t":1795202016021,"id":"4z","progress":0.591715976331361,"total":34,"current":23}
+{"_e":"metro:bundling:progress","_t":1795202016128,"id":"4z","progress":0.591715976331361,"total":37,"current":26}
+{"_e":"metro:bundling:progress","_t":1795202016219,"id":"4z","progress":0.591715976331361,"total":37,"current":27}
+{"_e":"metro:bundling:progress","_t":1795202016321,"id":"4z","progress":0.591715976331361,"total":46,"current":33}
+{"_e":"metro:bundling:progress","_t":1795202016423,"id":"4z","progress":0.591715976331361,"total":51,"current":37}
+{"_e":"metro:bundling:progress","_t":1795202016524,"id":"4z","progress":0.591715976331361,"total":67,"current":45}
+{"_e":"metro:bundling:progress","_t":1795202016626,"id":"4z","progress":0.591715976331361,"total":69,"current":49}
+{"_e":"metro:bundling:progress","_t":1795202016751,"id":"4z","progress":0.5951020408163266,"total":70,"current":54}
+{"_e":"metro:bundling:progress","_t":1795202016864,"id":"4z","progress":0.6026662049861495,"total":76,"current":59}
+{"_e":"metro:bundling:progress","_t":1795202016968,"id":"4z","progress":0.6026662049861495,"total":90,"current":67}
+{"_e":"metro:bundling:progress","_t":1795202017069,"id":"4z","progress":0.6301413540227441,"total":97,"current":77}
+{"_e":"metro:bundling:progress","_t":1795202017173,"id":"4z","progress":0.6663890045814245,"total":98,"current":80}
+{"_e":"metro:bundling:progress","_t":1795202017294,"id":"4z","progress":0.6663890045814245,"total":110,"current":88}
+{"_e":"metro:bundling:progress","_t":1795202017396,"id":"4z","progress":0.7346938775510203,"total":112,"current":96}
+{"_e":"metro:bundling:progress","_t":1795202017524,"id":"4z","progress":0.8163281009541398,"total":114,"current":103}
+{"_e":"metro:bundling:progress","_t":1795202017632,"id":"4z","progress":0.8992271105826397,"total":116,"current":110}
+{"_e":"metro:bundling:progress","_t":1795202020721,"id":"4z","progress":0.9156510107015458,"total":116,"current":111}
+{"_e":"metro:bundling:progress","_t":1795202020821,"id":"4z","progress":0.9156510107015458,"total":133,"current":118}
+{"_e":"metro:bundling:progress","_t":1795202020925,"id":"4z","progress":0.9407541409915767,"total":133,"current":129}
+{"_e":"metro:bundling:failed","_t":1795202020965,"id":"4z","message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Expected corresponding JSX closing tag for <Card>. (3212:26)\n\n  3210 |                               {fg ? <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a=\"override\" icon=\"edit\" /> : null}\n  3211 |                             </View>\n> 3212 |                           </Shell>\n       |                           ^\n  3213 |                           );\n  3214 | };\n  3215 |","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:bundling:started","_t":1795202108386,"id":"52","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795202108386,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202108388,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202108488,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202108696,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202108796,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202108898,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202108998,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202109100,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202109201,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202109305,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202110559,"id":"52","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795202111037,"id":"52","total":1,"ms":2650.5275}
+{"_e":"metro:client_log","_t":1795202112428,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795202112428,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795202112434,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:bundling:failed","_t":1795202154393,"id":"4z","message":"SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Identifier 'fg' has already been declared. (3126:18)\n\n  3124 |   };\n  3125 |             const fg = r.status === 'final' ? r.grade : null;\n> 3126 |             const fg = r.status === 'final' ? r.grade : null;\n       |                   ^\n  3127 |   const retakeCap = caps.find((c) => c.outcome !== 'accepted') || caps[caps.length - 1];\n  3128 |             return (\n  3129 |             <Shell idx={5} left={[backBtn('go', 'grader'), retakeCap ? B('Retake', 'retakeType', retakeCap.type, '', '', 'refresh') : null, helpBtn()]}","importStack":null,"filename":"App.js","targetModuleName":null,"originModulePath":null}
+{"_e":"metro:client_log","_t":1795202154440,"level":"error","data":["[TransformError: SyntaxError: C:\\Users\\g11ar\\OneDrive\\Pictures\\TUNAEYE\\TunaEyePhone\\App.js: Identifier 'fg' has already been declared. (3126:18)\n\n  3124 |   };\n  3125 |             const fg = r.status === 'final' ? r.grade : null;\n> 3126 |             const fg = r.status === 'final' ? r.grade : null;\n       |                   ^\n  3127 |   const retakeCap = caps.find((c) => c.outcome !== 'accepted') || caps[caps.length - 1];\n  3128 |             return (\n  3129 |             <Shell idx={5} left={[backBtn('go', 'grader'), retakeCap ? B('Retake', 'retakeType', retakeCap.type, '', '', 'refresh') : null, helpBtn()]}]"]}
+{"_e":"root:init","_t":1795202407897,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1795202407899,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1795202407905,"mode":"development","files":["../..\\..\\.env"],"env":{"EXPO_PUBLIC_PI_API_URL":"http://10.42.0.1:5000","EXPO_PUBLIC_SUPABASE_ANON_KEY":"sb_publishable_fCSS9qu_SIDZPxklimXQuQ_dz3dlTM3","EXPO_PUBLIC_SUPABASE_URL":"https://wafhvgwujqgkxffvrvvl.supabase.co"}}
+{"_e":"devserver:start","_t":1795202410375,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1795202411518,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1795202413465,"plugins":[]}
+{"_e":"metro:instantiate","_t":1795202421475,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1795202483330,"id":"1","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795202483330,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202483336,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202483690,"id":"1","progress":0.04000000000000001,"total":4,"current":2}
+{"_e":"metro:bundling:progress","_t":1795202483791,"id":"1","progress":0.04195093627522137,"total":83,"current":17}
+{"_e":"metro:bundling:progress","_t":1795202483891,"id":"1","progress":0.26388628260461633,"total":146,"current":75}
+{"_e":"metro:bundling:progress","_t":1795202483993,"id":"1","progress":0.30697589481373266,"total":222,"current":123}
+{"_e":"metro:bundling:progress","_t":1795202484093,"id":"1","progress":0.4812890625,"total":320,"current":222}
+{"_e":"metro:bundling:progress","_t":1795202484195,"id":"1","progress":0.6872667722623426,"total":386,"current":320}
+{"_e":"metro:bundling:progress","_t":1795202484295,"id":"1","progress":0.8423719271908425,"total":438,"current":402}
+{"_e":"metro:bundling:progress","_t":1795202484396,"id":"1","progress":0.9545983499025893,"total":479,"current":468}
+{"_e":"metro:bundling:done","_t":1795202484507,"id":"1","total":479,"ms":1177.1937}
+{"_e":"metro:client_log","_t":1795202484685,"level":"info","data":["%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools","font-weight:bold"]}
+{"_e":"metro:client_log","_t":1795202484685,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795202484686,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795202484713,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
+{"_e":"metro:client_log","_t":1795202489774,"level":"warn","data":["Cannot record touch end without a touch start.\n","Touch End: {\"identifier\":0,\"pageX\":1781,\"pageY\":388,\"timestamp\":6537.9000000003725}\n","Touch Bank: []"]}
+{"_e":"metro:client_log","_t":1795202502208,"level":"warn","data":["props.pointerEvents is deprecated. Use style.pointerEvents"]}
+{"_e":"metro:bundling:started","_t":1795202506044,"id":"b","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:progress","_t":1795202506044,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1795202506046,"id":"b","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795202506071,"id":"b","total":1,"ms":26.2076}
+{"_e":"metro:bundling:started","_t":1795202506092,"id":"c","platform":"web","environment":null,"entry":"node_modules\\barcode-detector\\dist\\es\\index.js"}
+{"_e":"metro:bundling:started","_t":1795202912635,"id":"j","platform":"web","environment":null,"entry":"node_modules\\expo\\AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1795202912635,"id":"j","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1795202912674,"id":"j","total":1,"ms":38.8115}
+{"_e":"metro:client_log","_t":1795202913006,"level":"log","data":["Running application \"main\" with appParams:\n","{\"hydrate\": undefined, \"rootTag\": \"#root\"}","\nDevelopment-level warnings: ON.\nPerformance optimizations: OFF."]}
+{"_e":"metro:client_log","_t":1795202913007,"level":"warn","data":["\"shadow*\" style props are deprecated. Use \"boxShadow\"."]}
+{"_e":"metro:client_log","_t":1795202913007,"level":"warn","data":["Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"]}
