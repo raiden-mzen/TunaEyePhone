@@ -1115,8 +1115,14 @@ const A = {
     confirmGraderIdentity(clean);
   },
   tutNext() {
+    clearTimeout(S.timers.tut);
     if (S.tutorialStep < 3) showPlacementTutorial(S.tutorialStep + 1);
     else { const s = S.session; go(s && s.phone === 'connected' ? 'camera' : 'pair'); }
+  },
+  tutStep(n) {
+    clearTimeout(S.timers.tut);
+    S.tutorialStep = Math.max(1, Math.min(3, Number(n) || 1));
+    render();
   },
   tutClose() {
     clearTimeout(S.timers.tut);
@@ -2133,29 +2139,219 @@ screens.grader = () => {
   );
 };
 
+const TUT_STEPS = [
+  {
+    tag: 'STEP 01 · PREPARE',
+    badge: 'Clean & dry surface',
+    t: 'Pull out the tray',
+    b: 'Slide out the chamber tray by its handle and make sure the surface is clean.',
+    tips: ['Dry tray', 'No debris'],
+    bg: '#1F5CFF',
+    accent: '#5DD9F5',
+  },
+  {
+    tag: 'STEP 02 · ALIGN',
+    badge: 'Centered · Cut face up',
+    t: 'Place the sample',
+    b: 'Lay the Sashibo core flat and centered inside the green crosshair.',
+    tips: ['Flat & centered', 'Cut face up'],
+    bg: '#1D4FD8',
+    accent: '#22B573',
+  },
+  {
+    tag: 'STEP 03 · CAPTURE',
+    badge: 'Optical scan ready',
+    t: 'Close and scan',
+    b: 'Close the tray smoothly and tap capture to grade in seconds.',
+    tips: ['Smooth close', 'Instant grade'],
+    bg: '#173B6C',
+    accent: '#5DD9F5',
+  },
+];
+
+function TutorialStage({ step, width }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(0)).current;
+  const enter = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    enter.setValue(0);
+    Animated.spring(enter, { toValue: 1, friction: 7, tension: 70, useNativeDriver: true }).start();
+
+    pulse.setValue(0);
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    slide.setValue(0);
+    const slideLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(slide, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.delay(350),
+        Animated.timing(slide, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.delay(250),
+      ]),
+    );
+    pulseLoop.start();
+    slideLoop.start();
+    return () => { pulseLoop.stop(); slideLoop.stop(); };
+  }, [step, enter, pulse, slide]);
+
+  const meta = TUT_STEPS[step - 1] || TUT_STEPS[0];
+  const stageW = Math.min(280, Math.max(210, width - 84));
+  const traySlideX = slide.interpolate({ inputRange: [0, 1], outputRange: [0, 34] });
+  const trayCloseX = slide.interpolate({ inputRange: [0, 1], outputRange: [34, 0] });
+  const scanX = slide.interpolate({ inputRange: [0, 1], outputRange: [-stageW * 0.36, stageW * 0.36] });
+  const sampleDropY = slide.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] });
+  const sampleScale = slide.interpolate({ inputRange: [0, 1], outputRange: [1.1, 1] });
+  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.06] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.95] });
+  const cardScale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+
+  return (
+    <View style={{
+      width: '100%', backgroundColor: meta.bg, borderRadius: 28, padding: 18, paddingTop: 16, paddingBottom: 20,
+      alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      shadowColor: meta.bg, shadowOpacity: 0.28, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6,
+    }}>
+      {/* Decorative glowing orbs & step watermark */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: -42, left: -36, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+      <View pointerEvents="none" style={{ position: 'absolute', bottom: -54, right: -30, width: 170, height: 170, borderRadius: 85, backgroundColor: 'rgba(93,217,245,0.12)' }} />
+      <Text style={{ position: 'absolute', top: 8, right: 18, fontSize: 56, fontWeight: '800', color: 'rgba(255,255,255,0.14)' }}>{`0${step}`}</Text>
+
+      {/* Top status pill */}
+      <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.16)', marginBottom: 14 }}>
+        <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: meta.accent, opacity: ringOpacity }} />
+        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#fff', letterSpacing: 0.3 }}>{meta.badge}</Text>
+      </View>
+
+      <Animated.View style={{ alignItems: 'center', justifyContent: 'center', transform: [{ scale: cardScale }] }}>
+        {step === 1 ? (
+          <View style={{ width: stageW, height: 176, alignItems: 'center', justifyContent: 'center' }}>
+            {/* Kiosk chamber body */}
+            <View style={{ width: stageW * 0.72, height: 132, borderRadius: 22, backgroundColor: '#0F2747', borderWidth: 2, borderColor: 'rgba(255,255,255,0.22)', padding: 14, justifyContent: 'space-between', marginRight: 28 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.75)', letterSpacing: 1 }}>TUNAEYE</Text>
+                <View style={{ flexDirection: 'row', gap: 5 }}>
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#22B573' }} />
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#5DD9F5' }} />
+                </View>
+              </View>
+              <View style={{ height: 68, borderRadius: 12, backgroundColor: '#091930', borderWidth: 1, borderColor: 'rgba(93,217,245,0.25)' }} />
+            </View>
+            {/* Sliding tray */}
+            <Animated.View style={{
+              position: 'absolute', right: 6, width: stageW * 0.56, height: 74, borderRadius: 16,
+              backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#DCE7F5',
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14,
+              shadowColor: '#000', shadowOpacity: 0.24, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 5,
+              transform: [{ translateX: traySlideX }],
+            }}>
+              <View style={{ flex: 1, height: 46, borderRadius: 10, backgroundColor: '#F2F6FC', borderWidth: 1, borderStyle: 'dashed', borderColor: '#B8C9E2', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: C.text2 }}>SAMPLE TRAY</Text>
+              </View>
+              <View style={{ width: 10, height: 34, borderRadius: 5, backgroundColor: meta.accent, marginLeft: 10 }} />
+            </Animated.View>
+          </View>
+        ) : step === 2 ? (
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <ChamberLine w={stageW} />
+            <Animated.View pointerEvents="none" style={{
+              position: 'absolute', width: stageW * 0.44, height: stageW * 0.44, borderRadius: 20,
+              borderWidth: 2, borderColor: '#22B573', backgroundColor: 'rgba(34,181,115,0.08)',
+              opacity: ringOpacity, transform: [{ scale: ringScale }],
+            }} />
+            <Animated.View pointerEvents="none" style={{
+              position: 'absolute', alignItems: 'center', justifyContent: 'center',
+              transform: [{ translateY: sampleDropY }, { scale: sampleScale }],
+            }}>
+              <Image source={IMG.core} style={{ width: 76, height: 48 }} resizeMode="contain" />
+            </Animated.View>
+          </View>
+        ) : (
+          <View style={{ width: stageW, height: 176, alignItems: 'center', justifyContent: 'center' }}>
+            {/* Sliding tray closing */}
+            <Animated.View style={{
+              position: 'absolute', right: 12, width: stageW * 0.48, height: 68, borderRadius: 14,
+              backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#DCE7F5',
+              alignItems: 'center', justifyContent: 'center',
+              transform: [{ translateX: trayCloseX }],
+            }}>
+              <Image source={IMG.core} style={{ width: 52, height: 34 }} resizeMode="contain" />
+            </Animated.View>
+            {/* Chamber optical scanner */}
+            <View style={{
+              width: stageW * 0.78, height: 136, borderRadius: 22, backgroundColor: '#0E2444',
+              borderWidth: 2, borderColor: 'rgba(93,217,245,0.45)', padding: 14, justifyContent: 'space-between', overflow: 'hidden',
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#5DD9F5', letterSpacing: 1 }}>OPTICAL SCAN</Text>
+                <Animated.View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(34,181,115,0.22)', opacity: ringOpacity }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#4ADE80' }}>LIVE</Text>
+                </Animated.View>
+              </View>
+              <View style={{ height: 74, borderRadius: 14, backgroundColor: '#08172E', borderWidth: 1, borderColor: 'rgba(93,217,245,0.3)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                <Image source={IMG.core} style={{ width: 72, height: 46, opacity: 0.9 }} resizeMode="contain" />
+                <Animated.View style={{
+                  position: 'absolute', top: 0, bottom: 0, width: 4, borderRadius: 2,
+                  backgroundColor: '#5DD9F5', shadowColor: '#5DD9F5', shadowOpacity: 0.9, shadowRadius: 10,
+                  transform: [{ translateX: scanX }],
+                }} />
+              </View>
+            </View>
+          </View>
+        )}
+      </Animated.View>
+    </View>
+  );
+}
+
 screens.tutorial = () => {
   const step = S.tutorialStep || 1;
-  const info = [
-    { t: 'Pull out the tray', b: 'Use the chamber handle and make sure the surface is clean.' },
-    { t: 'Place the sample', b: 'Lay the Sashibo core flat and centered inside the outline.' },
-    { t: 'Close and scan', b: 'Close the tray smoothly and capture to grade immediately.' },
-  ][step - 1];
+  const info = TUT_STEPS[step - 1] || TUT_STEPS[0];
+  const winW = Dimensions.get('window').width;
   return (
     <Shell idx={2} left={[backBtn('go', 'weight'), helpBtn()]}
-      right={[B(step < 3 ? 'Next' : 'Continue', 'tutNext', '', 'primary', false, 'arrow'), B('Close', 'tutClose', '', 'ghost')]}>
-      <View style={[BODY, { gap: 14, alignItems: 'center', justifyContent: 'center', paddingBottom: 16 }]}>
+      right={[B(step < 3 ? 'Next' : 'Continue', 'tutNext', '', 'primary', false, 'arrow'), B('Skip', 'tutClose', '', 'ghost')]}>
+      <View style={[BODY, { gap: 12, alignItems: 'center', justifyContent: 'center', paddingBottom: 14 }]}>
+        {/* Interactive step selector pills */}
         <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-          {[1, 2, 3].map((n) => (
-            <View key={n} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: n <= step ? C.primary : C.border }} />
-          ))}
+          {[1, 2, 3].map((n) => {
+            const active = n === step;
+            const done = n < step;
+            return (
+              <Pressable key={n} onPress={() => act('tutStep', n)} style={{
+                flex: 1, height: 34, borderRadius: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                backgroundColor: active ? C.primary : done ? '#DCE7FF' : C.surface,
+                borderWidth: 1.5, borderColor: active ? C.primary : done ? '#B4CAFF' : C.border,
+              }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '800', color: active ? '#fff' : done ? C.primary : C.text2 }}>{`0${n}`}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : done ? C.primary : C.text2 }}>
+                  {n === 1 ? 'Tray' : n === 2 ? 'Place' : 'Scan'}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
-        <View style={{ width: '100%', backgroundColor: C.primary, borderRadius: 26, padding: 20, alignItems: 'center', justifyContent: 'center', shadowColor: C.primary, shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 5 }}>
-          <Text style={{ position: 'absolute', top: 12, right: 18, fontSize: 54, fontWeight: '800', color: 'rgba(255,255,255,0.16)' }}>{`0${step}`}</Text>
-          <ChamberLine w={Math.min(280, Dimensions.get('window').width - 80)} />
-        </View>
-        <Card lift style={{ width: '100%', gap: 6, alignItems: 'center' }}>
+
+        <TutorialStage step={step} width={winW} />
+
+        <Card lift style={{ width: '100%', gap: 8, alignItems: 'center', paddingVertical: 18 }}>
+          <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, backgroundColor: '#EEF4FF' }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: C.primary, letterSpacing: 0.6 }}>{info.tag}</Text>
+          </View>
           <Txt k="h1" style={{ textAlign: 'center', fontSize: 24 }}>{info.t}</Txt>
           <Txt k="sub" style={{ textAlign: 'center' }}>{info.b}</Txt>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 2 }}>
+            {info.tips.map((tip) => (
+              <View key={tip} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: '#F3F7FD', borderWidth: 1, borderColor: C.border }}>
+                <Icon n="check" s={13} c={C.online} w={2.8} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: C.navy }}>{tip}</Text>
+              </View>
+            ))}
+          </View>
         </Card>
       </View>
     </Shell>
