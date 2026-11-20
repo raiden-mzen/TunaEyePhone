@@ -2545,11 +2545,20 @@ screens.camera = () => {
             ? B(S.busy ? 'Capturing…' : 'Scan sample', 'capturePi', '', 'primary', S.busy || S.picking || !linked, 'camera')
             : B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera'),
       ]}>
-      <View style={[BODY, { gap: 10, alignItems: 'center', paddingBottom: 8 }]}>
-        {chip(`${s.recordId} · ${fmtKg(s.weightTenths)}`, '')}
-        <Txt k="title" style={{ fontSize: 30, paddingTop: 2, textAlign: 'center' }}>
+      <View style={[BODY, { gap: 10, alignItems: 'center', paddingBottom: 12 }]}>
+        <Txt k="title" style={{ fontSize: 28, paddingTop: 2, textAlign: 'center' }}>
           {isTail ? 'Show the tail cut face' : 'Place the core in the frame'}
         </Txt>
+        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: '#DCE5F2' }}>
+            <Text style={{ fontSize: 10.5, fontWeight: '700', color: C.text2, letterSpacing: 0.6 }}>ORDER</Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: C.navy }} numberOfLines={1}>{s.recordId}</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: '#DCE5F2' }}>
+            <Text style={{ fontSize: 10.5, fontWeight: '700', color: C.text2, letterSpacing: 0.6 }}>WEIGHT</Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: C.navy }}>{fmtKg(s.weightTenths)}</Text>
+          </View>
+        </View>
         {!S.demo.enabled ? (
           <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
             {B('RPi Stream', 'setCamSource', 'pi', usePiCam ? 'small primary' : 'small', false, 'camera', { flex: 1 })}
@@ -2578,16 +2587,13 @@ screens.review = () => {
   const tone = 'X';
   const bad = false;
   return (
-    <Shell idx={5} left={[backBtn('retake'), B('Retake', 'retake', '', 'ghost', false, 'refresh'), helpBtn()]} right={[B('Use image', 'useImage', '', 'primary', false, 'check')]}>
-      <View style={[BODY, { paddingBottom: 8, gap: 10 }]}>
+    <Shell idx={p.type === 'tail' ? 4 : 3} left={[backBtn('retake'), B('Retake', 'retake', '', 'ghost', false, 'refresh'), helpBtn()]} right={[B('Use image', 'useImage', '', 'primary', false, 'check')]}>
+      <View style={[BODY, { paddingBottom: 12, gap: 12 }]}>
+        <Txt k="title" style={{ fontSize: 28, textAlign: 'center' }}>Use this image?</Txt>
         <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>{photo(p.uri, tone, p.type, bad)}</ImgFrame>
-        <Card style={{ gap: 12 }}>
-          <Txt k="h2">Check the image</Txt>
-          <>
-            {chip('Image ready for grading', 'ok', 'check')}
-            <Txt>The image will be sent to the Raspberry Pi for grading.</Txt>
-          </>
-          <Txt k="det">{`Sample: ${TYPES[p.type].name}`}</Txt>
+        <Card lift style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: C.navy }}>{TYPES[p.type].name}</Text>
+          {chip('Ready', 'ok', 'check')}
         </Card>
       </View>
     </Shell>
@@ -2596,7 +2602,7 @@ screens.review = () => {
 
 screens.analysis = () => {
   const s = S.session, j = s.job || { stage: 0, state: 'run' }, p = s.pending;
-  const stages = ['Checking image', 'Waiting for the Raspberry Pi', 'Saving on device'];
+  const sampleLabel = p ? TYPES[p.type].name : 'Sashibo core';
   const rail = ['Capture', 'Analyze', 'Result'].map((n, i) => {
     const done = i === 0 || (i === 1 && j.stage >= 2), on = (i === 1 && j.stage < 2) || (i === 2 && j.stage >= 2);
     const col = done ? C.gA : on ? C.primary : C.text2;
@@ -2612,18 +2618,21 @@ screens.analysis = () => {
   });
   return (
     <Bare>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20, paddingHorizontal: 20 }}>
-        <ImgFrame style={{ width: 240, height: 180 }}>{p ? photo(p.uri, 'X', p.type) : null}</ImgFrame>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18, paddingHorizontal: 22 }}>
+        <ImgFrame style={{ width: 260, height: 195 }}>{p ? photo(p.uri, 'X', p.type) : null}</ImgFrame>
         {(j.state === 'timeout' || j.state === 'error') ? (
           <>
             {chip(j.state === 'error' ? 'Could not grade' : 'Taking longer than expected', 'amber', 'warn')}
-            <Txt style={{ textAlign: 'center', maxWidth: 640 }}>{j.msg || 'The analysis did not finish in time. Your image is kept. Try again or return to the camera.'}</Txt>
-            <View style={{ flexDirection: 'row', gap: 16 }}>{B('Retake', 'retake', '', '', '', '', { flex: 1 })}{B('Try again', 'retryAnalysis', '', 'primary', '', '', { flex: 1 })}</View>
+            <Txt style={{ textAlign: 'center', maxWidth: 420 }}>{j.msg || 'The analysis did not finish in time. Try again or retake.'}</Txt>
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%', maxWidth: 360 }}>{B('Retake', 'retake', '', '', '', '', { flex: 1 })}{B('Try again', 'retryAnalysis', '', 'primary', '', '', { flex: 1 })}</View>
           </>
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}><Spin /><Txt k="h2">{`${stages[Math.min(j.stage, 2)]}…`}</Txt></View>
+          <View style={{ alignItems: 'center', gap: 12 }}>
+            <Spin />
+            <Txt k="h1" style={{ textAlign: 'center' }}>{`Reading ${sampleLabel.toLowerCase()}…`}</Txt>
+          </View>
         )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>{rail}</View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>{rail}</View>
       </View>
     </Bare>
   );
