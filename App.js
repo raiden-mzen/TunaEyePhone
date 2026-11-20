@@ -1622,14 +1622,11 @@ function Logo({ s = 28, light }) {
     </Pressable>
   );
 }
-function Header({ idx }) {
-  const { width } = useWindowDimensions();
-  const compact = width < 430;
+function Header() {
   const dot = S.net === 'online' ? C.online : '#E0A100';
   const home = () => { if (S.session) act('cancelSession'); else if (S.screen !== 'welcome') act('go', 'welcome'); };
-  const shortLabels = ['Info', 'Pi', 'Core', 'Tail', 'Grade', 'Print'];
   return (
-    <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, gap: 8, width: '100%', maxWidth: 560, alignSelf: 'center' }}>
+    <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, width: '100%', maxWidth: 560, alignSelf: 'center' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 8, paddingLeft: 14, paddingRight: 8, borderWidth: 1, borderColor: '#DCE5F2', shadowColor: C.navy, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}>
         <Logo s={26} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1644,27 +1641,6 @@ function Header({ idx }) {
           </Pressable>
         </View>
       </View>
-      {idx ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: compact ? 8 : 14, borderWidth: 1, borderColor: '#DCE5F2', width: '100%', shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}>
-          {STEPS.map((label, i) => {
-            const n = i + 1;
-            const done = n < idx;
-            const active = n === idx;
-            const txt = compact ? shortLabels[i] : label;
-            return (
-              <React.Fragment key={label}>
-                {i > 0 && !compact ? <View style={{ flex: 1, maxWidth: 14, height: 2, borderRadius: 1, backgroundColor: done ? C.primary : '#DCE5F2' }} /> : null}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 2 : 4, flexShrink: 1 }}>
-                  <View style={{ width: compact ? 12 : 16, height: compact ? 12 : 16, borderRadius: 8, backgroundColor: done ? C.primary : active ? '#EEF4FF' : '#F1F5F9', borderWidth: active ? 2 : 0, borderColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
-                    {done ? <Icon n="check" s={compact ? 8 : 9} c="#fff" w={3} /> : active ? <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: C.primary }} /> : null}
-                  </View>
-                  <Text numberOfLines={1} style={{ fontSize: compact ? 9.5 : 11.5, fontWeight: active ? '800' : '600', color: active ? C.navy : done ? C.primary : C.text2 }}>{txt}</Text>
-                </View>
-              </React.Fragment>
-            );
-          })}
-        </View>
-      ) : null}
     </View>
   );
 }
