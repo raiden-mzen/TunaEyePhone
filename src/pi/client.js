@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { File, Paths } from 'expo-file-system';
+import { File, Paths, UploadTask, UploadType } from 'expo-file-system';
 import { PI_CONFIG, derivePiCameraUrls, piUrl } from './config';
 import { GRADE_LETTER } from './types';
 
@@ -67,40 +67,78 @@ export async function capturePiSnapshot(apiUrl = PI_CONFIG.apiUrl, snapshotUrlOv
 }
 
 export async function gradeWithPi(imageUri, piImageType, apiUrl = PI_CONFIG.apiUrl) {
-  const form = new FormData();
-  form.append('image_type', piImageType);
+  const gradeEndpoint = piUrl(PI_CONFIG.paths.grade, apiUrl);
   const uriStr = String(imageUri || '');
-  if (Platform.OS === 'web' || /^(blob:|data:|https?:)/i.test(uriStr)) {
-    const imgRes = await fetch(uriStr);
-    const blob = await imgRes.blob();
-    const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
-    form.append('image', blob, `capture.${ext}`);
-  } else {
-    const isPng = /\.png(\?|$)/i.test(uriStr);
-    const isWebp = /\.webp(\?|$)/i.test(uriStr);
-    const ext = isPng ? 'png' : isWebp ? 'webp' : 'jpg';
-    const mime = isPng ? 'image/png' : isWebp ? 'image/webp' : 'image/jpeg';
-    form.append('image', { uri: uriStr, name: `capture.${ext}`, type: mime });
+  const isPng = /\.png(\?|$)/i.test(uriStr);
+  const isWebp = /\.webp(\?|$)/i.test(uriStr);
+  const ext = isPng ? 'png' : isWebp ? 'webp' : 'jpg';
+  const mime = isPng ? 'image/png' : isWebp ? 'image/webp' : 'image/jpeg';
+
+  let statusCode = 0;
+  let bodyText = '';
+  let usedNativeUpload = false;
+
+  if (Platform.OS !== 'web' && /^file:\/\//i.test(uriStr)) {
+    try {
+      const task = new UploadTask(new File(uriStr), gradeEndpoint, {
+        httpMethod: 'POST',
+        uploadType: UploadType.MULTIPART,
+        fieldName: 'image',
+        mimeType: mime,
+        parameters: { image_type: String(piImageType) },
+      });
+      const res = await Promise.race([
+        task.uploadAsync(),
+        new Promise((_, rej) => setTimeout(() => {
+          try { task.cancel(); } catch { }
+          rej(Object.assign(new Error('timeout'), { name: 'AbortError' }));
+        }, PI_CONFIG.inferenceTimeout)),
+      ]);
+      statusCode = res.status;
+      bodyText = res.body || '';
+      usedNativeUpload = true;
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error('timeout');
+      // Fall back to fetch FormData below if native UploadTask could not read/open the URI.
+    }
   }
-  let r;
-  try {
-    r = await Promise.race([
-      fetch(piUrl(PI_CONFIG.paths.grade, apiUrl), { method: 'POST', body: form }),
-      new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })), PI_CONFIG.inferenceTimeout)),
-    ]);
-  } catch (e) {
-    throw new Error(e && e.name === 'AbortError' ? 'timeout' : 'unreachable');
+
+  if (!usedNativeUpload) {
+    const form = new FormData();
+    form.append('image_type', piImageType);
+    if (Platform.OS === 'web' || /^(blob:|data:|https?:)/i.test(uriStr)) {
+      const imgRes = await fetch(uriStr);
+      const blob = await imgRes.blob();
+      const bExt = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+      form.append('image', blob, `capture.${bExt}`);
+    } else {
+      form.append('image', { uri: uriStr, name: `capture.${ext}`, type: mime });
+    }
+    let r;
+    try {
+      r = await Promise.race([
+        fetch(gradeEndpoint, { method: 'POST', body: form }),
+        new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })), PI_CONFIG.inferenceTimeout)),
+      ]);
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error('timeout');
+      throw new Error(e && e.message && !/network request failed/i.test(e.message) ? `Pi upload failed: ${e.message}` : 'unreachable');
+    }
+    statusCode = r.status;
+    bodyText = await r.text().catch(() => '');
   }
-  if (r.status === 422) {
-    const body = await r.json().catch(() => ({}));
+
+  const parseJson = () => { try { return JSON.parse(bodyText); } catch { return null; } };
+  if (statusCode === 422) {
+    const body = parseJson() || {};
     const expected = piImageType === 'tailcut' ? 'Tail-Cut' : 'Sashibo Core';
     throw new Error(body?.error === 'sample_type_mismatch'
       ? `Wrong sample type. Please upload a ${expected} image.`
       : 'Sample type cannot be determined. Retake or upload another image.');
   }
-  if (!r.ok) throw new Error(`Pi grading failed (HTTP ${r.status})`);
-  let j;
-  try { j = await r.json(); } catch { throw new Error('Pi sent unreadable data.'); }
+  if (statusCode < 200 || statusCode >= 300) throw new Error(`Pi grading failed (HTTP ${statusCode})`);
+  const j = parseJson();
+  if (!j) throw new Error('Pi sent unreadable data.');
   if (typeof j.grade !== 'string' || typeof j.confidence !== 'number') throw new Error('Pi sent an unexpected response.');
   const invalid = j.grade === 'INVALID';
   const normalizedGrade = GRADE_LETTER[j.grade] || (['A', 'B', 'C'].includes(j.grade) ? j.grade : null);
