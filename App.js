@@ -26,7 +26,7 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Image, KeyboardAvoidingView, Linking, PanResponder, Platform, Pressable, SafeAreaView, ScrollView,
-  StatusBar, StyleSheet, Text, TextInput, View,
+  StatusBar, StyleSheet, Text, TextInput, useWindowDimensions, View,
 } from 'react-native';
 import Svg, {
   Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path,
@@ -373,7 +373,7 @@ async function syncPendingRecords({ limit = 200, graders } = {}) {
   const selected = Array.isArray(graders) ? graders.map((g) => validateGraderName(g).toLowerCase()).filter(Boolean) : null;
   if (!cloudOk()) {
     if (selected && selected.length) {
-      await AsyncStorage.setItem(PENDING_SYNC_GRADERS_KEY, JSON.stringify(selected)).catch(() => {});
+      await AsyncStorage.setItem(PENDING_SYNC_GRADERS_KEY, JSON.stringify(selected)).catch(() => { });
     }
     toast('Offline — selected graders saved and will sync automatically when online.', 'amber');
     return { synced: 0, queued: true };
@@ -407,7 +407,7 @@ async function syncPendingRecords({ limit = 200, graders } = {}) {
   clearTimeout(slowTimer);
   S.syncing.active = false;
   S.slowWifiModal = null;
-  await AsyncStorage.removeItem(PENDING_SYNC_GRADERS_KEY).catch(() => {});
+  await AsyncStorage.removeItem(PENDING_SYNC_GRADERS_KEY).catch(() => { });
   render();
   toast(okCount === items.length ? `Synced ${okCount} record(s).` : `Synced ${okCount} of ${items.length} record(s).`, okCount === items.length ? 'ok' : 'amber');
   return { synced: okCount };
@@ -617,7 +617,7 @@ function onSessionComplete() {
   const r = persist(s);
   r.closed = true;
   enqueue(r);
-  recordPlacementSession(s.grader).catch(() => {});
+  recordPlacementSession(s.grader).catch(() => { });
   go('completion');
 }
 
@@ -1612,10 +1612,13 @@ function Logo({ s = 28, light }) {
   );
 }
 function Header({ idx }) {
+  const { width } = useWindowDimensions();
+  const compact = width < 430;
   const dot = S.net === 'online' ? C.online : '#E0A100';
   const home = () => { if (S.session) act('cancelSession'); else if (S.screen !== 'welcome') act('go', 'welcome'); };
+  const shortLabels = ['Info', 'Pi', 'Core', 'Tail', 'Grade', 'Print'];
   return (
-    <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4, gap: 10 }}>
+    <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, gap: 8, width: '100%', maxWidth: 560, alignSelf: 'center' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 8, paddingLeft: 14, paddingRight: 8, borderWidth: 1, borderColor: '#DCE5F2', shadowColor: C.navy, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}>
         <Logo s={26} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1631,19 +1634,20 @@ function Header({ idx }) {
         </View>
       </View>
       {idx ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12, borderWidth: 1, borderColor: '#DCE5F2', alignSelf: 'center', gap: 6, shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: compact ? 10 : 14, borderWidth: 1, borderColor: '#DCE5F2', width: '100%', shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}>
           {STEPS.map((label, i) => {
             const n = i + 1;
             const done = n < idx;
             const active = n === idx;
+            const txt = compact ? shortLabels[i] : label;
             return (
               <React.Fragment key={label}>
-                {i > 0 ? <View style={{ width: 10, height: 2, borderRadius: 1, backgroundColor: done ? C.primary : '#DCE5F2' }} /> : null}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: done ? C.primary : active ? '#EEF4FF' : '#F1F5F9', borderWidth: active ? 2 : 0, borderColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
-                    {done ? <Icon n="check" s={10} c="#fff" w={3} /> : active ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.primary }} /> : null}
+                {i > 0 && !compact ? <View style={{ flex: 1, maxWidth: 14, height: 2, borderRadius: 1, backgroundColor: done ? C.primary : '#DCE5F2' }} /> : null}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 3 : 4, flexShrink: 1 }}>
+                  <View style={{ width: compact ? 14 : 16, height: compact ? 14 : 16, borderRadius: 8, backgroundColor: done ? C.primary : active ? '#EEF4FF' : '#F1F5F9', borderWidth: active ? 2 : 0, borderColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
+                    {done ? <Icon n="check" s={9} c="#fff" w={3} /> : active ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.primary }} /> : null}
                   </View>
-                  <Text style={{ fontSize: 11.5, fontWeight: active ? '800' : '600', color: active ? C.navy : done ? C.primary : C.text2 }}>{label}</Text>
+                  <Text numberOfLines={1} style={{ fontSize: compact ? 10.5 : 11.5, fontWeight: active ? '800' : '600', color: active ? C.navy : done ? C.primary : C.text2 }}>{txt}</Text>
                 </View>
               </React.Fragment>
             );
@@ -1772,7 +1776,7 @@ function Shell({ idx = 0, left = [], right = [], children }) {
 }
 
 function Bare({ children }) { return <View style={{ flex: 1 }}><Glow />{children}</View>; }
-const BODY = { flexGrow: 1, paddingTop: 4, paddingBottom: 10, gap: 10, justifyContent: 'center' };
+const BODY = { flexGrow: 1, width: '100%', maxWidth: 540, alignSelf: 'center', paddingTop: 4, paddingBottom: 10, gap: 10, justifyContent: 'center' };
 
 /* ---------- first-use coach tips (shown once per step, above the buttons) ---------- */
 const COACH = {
@@ -3539,7 +3543,7 @@ function Drawer() {
   const grp = (items) => <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{items}</View>;
   const p = (t) => <Text style={st.dp}>{t}</Text>;
   return (
-    <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 340, maxWidth: '100%', backgroundColor: C.chromeBg, borderLeftWidth: 1, borderLeftColor: C.chromeBorder, zIndex: 20 }}>
+    <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '88%', maxWidth: 340, backgroundColor: C.chromeBg, borderLeftWidth: 1, borderLeftColor: C.chromeBorder, zIndex: 20 }}>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ fontWeight: '700', fontSize: 14, color: C.chromeText }}>Demo controls</Text>{b('Close', 0, 'close')}</View>
         {p('Enable Demo mode to simulate Pi inference & camera, or jump to any screen.')}
@@ -3603,7 +3607,7 @@ export default function App() {
               syncPendingRecords({ limit: 200, graders: queued });
               return;
             }
-          } catch {}
+          } catch { }
           syncNow(); // connectivity-triggered, not polling/Realtime
         }
       });
