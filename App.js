@@ -1897,12 +1897,12 @@ function renderWelcome() {
 
   return (
     <Hero>
-      <View style={{ flex: 1, paddingHorizontal: 22, paddingTop: 14 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Logo s={30} light />
-          <Pressable onPress={() => { S.drawer = !S.drawer; render(); }} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 34, paddingHorizontal: 12, borderRadius: 17, backgroundColor: C.heroSoft }}>
-            <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: dot }} />
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{open ? 'TunaEye Station 01 · Ready' : 'Shift closed'}</Text>
+      <View style={{ flex: 1, paddingHorizontal: 22, paddingTop: 18 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <Logo s={28} light />
+          <Pressable onPress={() => { S.drawer = !S.drawer; render(); }} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: C.heroSoft, flexShrink: 1 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot }} />
+            <Text numberOfLines={1} style={{ fontSize: 12.5, fontWeight: '700', color: '#fff' }}>{open ? 'Ready' : 'Closed'}</Text>
           </Pressable>
         </View>
         <Text style={{ marginTop: 18, fontSize: 34 * TS(), lineHeight: 38 * TS(), fontWeight: '800', color: '#fff', letterSpacing: -0.9 }}>{'TunaEye\nStation 01'}</Text>
