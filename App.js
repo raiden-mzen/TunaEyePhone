@@ -112,6 +112,8 @@ const demoAssetFor = (type, code) => (DEMO_IMG[type === 'tail' ? 'tail' : 'core'
 const SAMPLE_AR = { core: 2.05, tail: 1.9 }; // width / height of each sample PNG
 const GC = { A: C.gA, B: C.gB, C: C.gC };
 const GBG = { A: C.gAbg, B: C.gBbg, C: C.gCbg };
+const GRADE_HERO = { A: '#15804B', B: '#C88000', C: '#C0392B' };
+const GRADE_SUB = { A: 'Premium quality', B: 'Standard quality', C: 'Commercial grade' };
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 const TYPES = { core: { name: 'Sashibo core', short: 'Core' }, tail: { name: 'Tail cut', short: 'Tail' } };
 const other = (t) => (t === 'core' ? 'tail' : 'core');
@@ -1634,7 +1636,7 @@ function Header({ idx }) {
         </View>
       </View>
       {idx ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: compact ? 10 : 14, borderWidth: 1, borderColor: '#DCE5F2', width: '100%', shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 6, paddingHorizontal: compact ? 8 : 14, borderWidth: 1, borderColor: '#DCE5F2', width: '100%', shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}>
           {STEPS.map((label, i) => {
             const n = i + 1;
             const done = n < idx;
@@ -1643,11 +1645,11 @@ function Header({ idx }) {
             return (
               <React.Fragment key={label}>
                 {i > 0 && !compact ? <View style={{ flex: 1, maxWidth: 14, height: 2, borderRadius: 1, backgroundColor: done ? C.primary : '#DCE5F2' }} /> : null}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 3 : 4, flexShrink: 1 }}>
-                  <View style={{ width: compact ? 14 : 16, height: compact ? 14 : 16, borderRadius: 8, backgroundColor: done ? C.primary : active ? '#EEF4FF' : '#F1F5F9', borderWidth: active ? 2 : 0, borderColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
-                    {done ? <Icon n="check" s={9} c="#fff" w={3} /> : active ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.primary }} /> : null}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 2 : 4, flexShrink: 1 }}>
+                  <View style={{ width: compact ? 12 : 16, height: compact ? 12 : 16, borderRadius: 8, backgroundColor: done ? C.primary : active ? '#EEF4FF' : '#F1F5F9', borderWidth: active ? 2 : 0, borderColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
+                    {done ? <Icon n="check" s={compact ? 8 : 9} c="#fff" w={3} /> : active ? <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: C.primary }} /> : null}
                   </View>
-                  <Text numberOfLines={1} style={{ fontSize: compact ? 10.5 : 11.5, fontWeight: active ? '800' : '600', color: active ? C.navy : done ? C.primary : C.text2 }}>{txt}</Text>
+                  <Text numberOfLines={1} style={{ fontSize: compact ? 9.5 : 11.5, fontWeight: active ? '800' : '600', color: active ? C.navy : done ? C.primary : C.text2 }}>{txt}</Text>
                 </View>
               </React.Fragment>
             );
@@ -1983,41 +1985,53 @@ screens.welcome = () => renderWelcome();
 screens.weight = () => {
   const s = S.session, chk = weightCheck(s.weightStr), editing = s.editingWeight, ts = TS();
   const keys = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['.', '0', 'Backspace']];
+  const pct = chk.ok ? Math.min(100, Math.max(5, ((chk.t - 150) / (2000 - 150)) * 100)) : 0;
   return (
     <Shell idx={1} left={[backBtn(editing ? 'go' : 'grader', editing ? (s.editFrom || 'price') : ''), helpBtn()]}
-      right={[B(editing ? 'Update price' : 'Start capture', 'weightNext', '', 'primary', !chk.ok, 'arrow')]}>
-      <View style={[BODY, { gap: 14, paddingTop: 12, paddingBottom: 20 }]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {chip(s.recordId, 'info')}
-          {chip(s.grader || '—', 'ok', 'check')}
-        </View>
-        <Txt k="title" style={{ fontSize: 30, textAlign: 'center' }}>Weight</Txt>
-
-        <Card lift style={{ gap: 12, paddingVertical: 18, paddingHorizontal: 18 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: C.text2 }}>15 – 200 kg</Text>
-            {B('Clear', 'clearWeight', '', 'small ghost')}
+      right={[B(editing ? 'Update price' : 'Start capture', 'weightNext', '', 'primary', !chk.ok, 'camera')]}>
+      <View style={[BODY, { gap: 12, paddingTop: 6, paddingBottom: 16 }]}>
+        <View style={{ backgroundColor: C.primary, borderRadius: 24, padding: 18, gap: 10, shadowColor: C.primary, shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 18 * ts, fontWeight: '800', color: '#fff' }}>Weigh the fish</Text>
+            <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: chk.ok ? '#fff' : 'rgba(255,255,255,0.2)' }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: chk.ok ? C.primary : '#fff' }}>{chk.ok ? 'Valid' : '15–200 kg'}</Text>
+            </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: chk.msg ? C.err : C.primary, borderRadius: 20, paddingHorizontal: 18, minHeight: 74 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
             <TextInput
-              style={{ flex: 1, fontSize: 44 * ts, fontWeight: '800', color: C.navy, paddingVertical: 0 }}
+              style={{ flex: 1, fontSize: 52 * ts, fontWeight: '800', color: '#fff', paddingVertical: 0 }}
               value={s.weightStr} onChangeText={(v) => setWeight(v)}
-              keyboardType="decimal-pad" placeholder="0.0" placeholderTextColor="#AAB8C8" maxLength={5} selectTextOnFocus
+              keyboardType="decimal-pad" placeholder="0" placeholderTextColor="rgba(255,255,255,0.45)" maxLength={5} selectTextOnFocus
             />
-            <Text style={{ fontSize: 20, fontWeight: '700', color: C.text2 }}>kg</Text>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: 'rgba(255,255,255,0.9)' }}>kg</Text>
           </View>
-          {chk.msg ? <Text style={{ color: C.err, fontSize: 13 }}>{chk.msg}</Text> : null}
-          <View style={{ gap: 8, marginTop: 4 }}>
-            {keys.map((row, idx) => (
-              <View key={idx} style={{ flexDirection: 'row', gap: 8 }}>
-                {row.map((k) => (
-                  <Pressable key={k} onPress={() => setWeight(k)} style={({ pressed }) => [st.key, { minHeight: 50 }, pressed && { backgroundColor: '#EEF4FF' }]}>
-                    <Text style={[st.keyText, { fontSize: k === 'Backspace' ? 18 : 24 }]}>{k === 'Backspace' ? '⌫' : k}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ))}
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' }}>
+            <View style={{ width: `${pct}%`, height: '100%', backgroundColor: '#fff', borderRadius: 3 }} />
           </View>
+          {chk.msg ? <Text style={{ color: '#FFE4E4', fontSize: 12.5, fontWeight: '600' }}>{chk.msg}</Text> : null}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 12, padding: 10 }}>
+              <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Order</Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }} numberOfLines={1}>{s.recordId}</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 12, padding: 10 }}>
+              <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Grader</Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }} numberOfLines={1}>{s.grader || '—'}</Text>
+            </View>
+          </View>
+        </View>
+
+        <Card lift style={{ gap: 8, paddingVertical: 14, paddingHorizontal: 14 }}>
+          {keys.map((row, idx) => (
+            <View key={idx} style={{ flexDirection: 'row', gap: 8 }}>
+              {row.map((k) => (
+                <Pressable key={k} onPress={() => setWeight(k)} style={({ pressed }) => [st.key, { minHeight: 48, backgroundColor: k === 'Backspace' ? '#FBE9E9' : C.surface, borderColor: k === 'Backspace' ? '#F2C6C6' : C.border }, pressed && { backgroundColor: '#EEF4FF' }]}>
+                  <Text style={[st.keyText, { fontSize: k === 'Backspace' ? 18 : 22, color: k === 'Backspace' ? C.err : C.navy }]}>{k === 'Backspace' ? '⌫' : k}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ))}
+          {B('Clear', 'clearWeight', '', 'small ghost')}
         </Card>
       </View>
     </Shell>
@@ -2602,12 +2616,30 @@ const sampleInfoCard = (c, s, extraRows, foot) => (
 );
 
 const valueCard = (s, p) => (
-  <Card lift style={{ alignItems: 'center', gap: 10, paddingVertical: 24 }}>
-    <Txt k="label">Estimated value</Txt>
-    {p.ok ? (<>
-      <Text style={{ fontSize: 44 * TS(), fontWeight: '800', color: C.navy, textAlign: 'center' }}>{fmtMoney(p.total)}</Text>
-      <Txt k="sub">{`${fmtKg(s.weightTenths)} × ${fmtMoney(p.rate)}/kg`}</Txt>
-    </>) : (<>{chip('Unavailable', 'amber', 'warn')}<Txt k="sub" style={{ textAlign: 'center' }}>{p.why}</Txt></>)}
+  <Card lift style={{ gap: 12, paddingVertical: 18, paddingHorizontal: 18 }}>
+    <Text style={{ fontSize: 11.5, fontWeight: '800', color: C.text2, letterSpacing: 0.8 }}>TOTAL VALUE</Text>
+    {p.ok ? (
+      <>
+        <Text style={{ fontSize: 36 * TS(), fontWeight: '800', color: C.primary }}>{fmtMoney(p.total)}</Text>
+        <Txt k="sub">{`${fmtKg(s.weightTenths)} × ${fmtMoney(p.rate)} / kg`}</Txt>
+        <View style={{ backgroundColor: C.canvas, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: C.border }}>
+          <KV l="Weight" r={fmtKg(s.weightTenths)} />
+          <KV l="Rate" r={`${fmtMoney(p.rate)} / kg`} />
+          <KV l="Grade" r={`${p.grade} · ${GRADE_SUB[p.grade] || ''}`} last />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {['A', 'B', 'C'].map((gr) => {
+            const on = p.grade === gr;
+            return (
+              <View key={gr} style={{ flex: 1, borderRadius: 14, paddingVertical: 10, alignItems: 'center', backgroundColor: on ? GRADE_HERO[gr] : C.canvas, borderWidth: 1, borderColor: on ? GRADE_HERO[gr] : C.border }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: on ? '#fff' : C.text2 }}>{gr}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: on ? 'rgba(255,255,255,0.9)' : C.text2 }}>{fmtMoney(S.schedule.rates[gr]).replace('.00', '')}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </>
+    ) : (<>{chip('Unavailable', 'amber', 'warn')}<Txt k="sub">{p.why}</Txt></>)}
     {B('Fix weight', 'correctWeight', '', 'small ghost', false, 'edit')}
   </Card>
 );
@@ -2616,66 +2648,61 @@ screens.result = () => {
   const s = S.session, c = s.captures[s.captures.length - 1], p = priceFor(s), r = resolve(s);
   const g = r.status === 'final' ? r.grade : c.label, manual = r.origin === 'manual', pct = Math.round(c.score * 1000) / 10;
   const tailPrompt = Boolean(r.tailNeeded && c.type === 'core');
+  const heroBg = tailPrompt ? '#FFF9EC' : GRADE_HERO[g] || C.primary;
   return (
     <Shell idx={5} left={[backBtn('go', 'grader'), B('Retake', 'retakeSaved', '', 'ghost', false, 'refresh'), helpBtn()]}
       right={[
         tailPrompt ? B('Capture tail cut', 'captureTail', '', 'primary', false, 'camera') : null,
         !tailPrompt ? B('Print receipt', 'confirmQuote', '', 'primary', !p.ok, 'print') : null,
       ]}>
-      <View style={[BODY, { gap: 12, paddingBottom: 8 }]}>
+      <View style={[BODY, { gap: 12, paddingBottom: 16 }]}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <View>
-            <Txt k="title" style={{ fontSize: 30 }}>{tailPrompt ? 'Tail cut needed' : 'Final grade'}</Txt>
+            <Txt k="title" style={{ fontSize: 28 }}>{tailPrompt ? 'Tail cut needed' : 'Final grade'}</Txt>
             <Txt k="det">{`${s.recordId} · ${s.grader} · ${fmtKg(s.weightTenths)}`}</Txt>
           </View>
           {tailPrompt ? chip('Action needed', 'amber', 'warn') : r.provisional ? chip('Provisional', 'amber', 'warn') : chip('Graded', 'ok', 'check')}
         </View>
 
-        <Card lift style={{ alignItems: 'center', gap: 6, paddingVertical: 20, backgroundColor: tailPrompt ? C.amberbg : GBG[g], borderColor: tailPrompt ? '#EBD59C' : C.border }}>
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <Txt k="label">{TYPES[c.type].name}</Txt>
-            {r.provisional ? chip('Provisional', 'amber', 'warn') : null}
-          </View>
+        <Card lift style={{ alignItems: 'center', gap: 8, paddingVertical: 22, backgroundColor: heroBg, borderColor: tailPrompt ? '#EBD59C' : heroBg }}>
           {tailPrompt ? (
             <>
               <Text style={{ fontSize: 48 * TS(), fontWeight: '800', color: C.navy }}>{`${pct}%`}</Text>
               <Txt k="sub" style={{ color: C.amber, fontWeight: '700' }}>{`Grade ${g} · ${pct < 75 ? 'Under 75%' : 'Grade C check'}`}</Txt>
-              <View style={{ width: '85%', height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.75)', overflow: 'hidden', marginTop: 4 }}>
+              <View style={{ width: '88%', height: 10, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                 <View style={{ width: `${Math.min(100, pct)}%`, height: '100%', backgroundColor: C.amber }} />
               </View>
-              <Txt k="sub" style={{ textAlign: 'center', color: '#5F3B00', marginTop: 6 }}>
-                {r.reason}
-              </Txt>
+              <Txt k="sub" style={{ textAlign: 'center', color: '#5F3B00', marginTop: 4 }}>{r.reason}</Txt>
             </>
           ) : (
             <>
-              <View style={{ width: 92, height: 92, borderRadius: 46, borderWidth: 4, borderColor: GC[g], alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.6)', marginVertical: 4 }}>
-                <Text style={{ fontSize: 52 * TS(), fontWeight: '800', color: GC[g] }}>{g}</Text>
+              <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)' }}>
+                <Text style={{ fontSize: 48 * TS(), fontWeight: '800', color: '#fff' }}>{g}</Text>
               </View>
-              <Txt k="h2" style={{ color: GC[g] }}>{`Grade ${g}${r.provisional ? ' (Provisional)' : ''}`}</Txt>
-              {manual ? (
-                <View style={{ marginTop: 6, alignItems: 'center', gap: 6 }}>
-                  {chip('Manual override', 'amber', 'edit')}
-                  <Txt k="det">{`Model suggested ${c.label} at ${pct}%`}</Txt>
+              <Text style={{ fontSize: 26 * TS(), fontWeight: '800', color: '#fff' }}>{`Grade ${g}${r.provisional ? ' (Provisional)' : ''}`}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.9)' }}>{GRADE_SUB[g] || ''}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14, marginTop: 4 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' }}>{manual ? 'Manual override' : 'Model confidence'}</Text>
+                <View style={{ backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                  <Text style={{ color: heroBg, fontSize: 13, fontWeight: '800' }}>{`${pct}%`}</Text>
                 </View>
-              ) : (
-                <View style={{ width: '84%', marginTop: 6 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Txt k="det">Confidence (≥ 75% threshold)</Txt><Text style={{ fontWeight: '800', color: GC[g] }}>{pct}%</Text>
-                  </View>
-                  <View style={{ height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.75)', overflow: 'hidden' }}>
-                    <View style={{ width: `${Math.min(100, pct)}%`, height: '100%', backgroundColor: GC[g] }} />
-                  </View>
+              </View>
+              <View style={{ width: '88%', marginTop: 8, gap: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '700' }}>{`${TYPES[c.type].short} · Grade ${c.label}`}</Text>
+                  <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '800' }}>{`${pct}%`}</Text>
                 </View>
-              )}
+                <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.min(100, pct)}%`, height: '100%', backgroundColor: '#fff', borderRadius: 4 }} />
+                </View>
+              </View>
             </>
           )}
         </Card>
 
         {tailPrompt ? (
           <Card style={{ gap: 10 }}>
-            <Txt k="h2">Next: Supplementary Tail-Cut</Txt>
-            <Txt k="sub">Scan the Tail-Cut face to combine both model predictions, or mark Tail-Cut unavailable.</Txt>
+            <Txt k="h2">Is a Tail-Cut sample available?</Txt>
             <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
               {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { flex: 1 })}
               {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { flex: 1 })}
@@ -2683,7 +2710,15 @@ screens.result = () => {
           </Card>
         ) : (
           <>
-            {sampleInfoCard(c, s, [['Sample', TYPES[c.type].name], ['Confidence', `${pct}%`]], null)}
+            <Card style={{ padding: 12, gap: 10 }}>
+              <ImgFrame style={{ width: '100%', height: 150 }}>{imgFor(c)}</ImgFrame>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontWeight: '800', color: C.navy, fontSize: 15 }}>{`${TYPES[c.type].short} sample`}</Text>
+                <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: GRADE_HERO[c.label] || C.primary }}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{`Grade ${c.label} · ${pct}%`}</Text>
+                </View>
+              </View>
+            </Card>
             {valueCard(s, p)}
           </>
         )}
@@ -2771,13 +2806,17 @@ screens.paired = () => {
         </View>
 
         {fg ? (
-          <Card lift style={{ alignItems: 'center', gap: 10, paddingVertical: 22, backgroundColor: GBG[fg] }}>
-            <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: GC[fg], alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.65)' }}>
-              <Text style={{ fontSize: 50 * TS(), fontWeight: '800', color: GC[fg] }}>{fg}</Text>
+          <Card lift style={{ alignItems: 'center', gap: 10, paddingVertical: 22, backgroundColor: GRADE_HERO[fg], borderColor: GRADE_HERO[fg] }}>
+            <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)' }}>
+              <Text style={{ fontSize: 50 * TS(), fontWeight: '800', color: '#fff' }}>{fg}</Text>
             </View>
-            <Txt k="h1" style={{ color: GC[fg] }}>{`Grade ${fg}`}</Txt>
-            <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.75)' }}>
-              <Text style={{ fontWeight: '800', color: C.navy, fontSize: 13 }}>{`Avg confidence  ${avgPct}%`}</Text>
+            <Text style={{ fontSize: 26 * TS(), fontWeight: '800', color: '#fff' }}>{`Grade ${fg}`}</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.9)' }}>{GRADE_SUB[fg] || ''}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' }}>Avg confidence</Text>
+              <View style={{ backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                <Text style={{ color: GRADE_HERO[fg], fontSize: 13, fontWeight: '800' }}>{`${avgPct}%`}</Text>
+              </View>
             </View>
             <View style={{ width: '90%', gap: 8, marginTop: 6 }}>
               {caps.map((c) => {
@@ -2785,11 +2824,11 @@ screens.paired = () => {
                 return (
                   <View key={c.type} style={{ gap: 4 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>{`${TYPES[c.type].short} · Grade ${c.label}`}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: C.navy }}>{`${cpct}%`}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{`${TYPES[c.type].short} · Grade ${c.label}`}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>{`${cpct}%`}</Text>
                     </View>
-                    <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.7)', overflow: 'hidden' }}>
-                      <View style={{ width: `${Math.min(100, cpct)}%`, height: '100%', backgroundColor: GC[fg] }} />
+                    <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' }}>
+                      <View style={{ width: `${Math.min(100, cpct)}%`, height: '100%', backgroundColor: '#fff', borderRadius: 4 }} />
                     </View>
                   </View>
                 );
