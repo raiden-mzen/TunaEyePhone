@@ -1152,6 +1152,13 @@ const A = {
     m.error = '';
     render();
   },
+  graderInitialSet(v) {
+    const m = S.graderCheckModal;
+    if (!m) return;
+    m.initialStr = String(v || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 4);
+    m.error = '';
+    render();
+  },
   graderInitialConfirm() {
     const m = S.graderCheckModal;
     const s = S.session;
@@ -2030,6 +2037,17 @@ screens.grader = () => {
             ) : (
               <View style={{ gap: 10 }}>
                 <Txt k="label">{`Add 1–4 last-initial characters for "${gm.typed} ${gm.initialStr || '_'}"`}</Txt>
+                <TextInput
+                  value={gm.initialStr}
+                  onChangeText={(v) => act('graderInitialSet', v)}
+                  placeholder="Type 1–4 characters (e.g. H)"
+                  placeholderTextColor="#8A99AB"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoFocus
+                  maxLength={4}
+                  style={[st.field, { minHeight: 48, borderRadius: 14, fontSize: 18 * ts, fontWeight: '700', paddingHorizontal: 14, borderColor: C.primary, backgroundColor: '#fff' }]}
+                />
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {initials.map((ch) => (
                     <Pressable key={ch} onPress={() => act('graderInitialKey', ch)} style={{ width: 34, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.canvas, alignItems: 'center', justifyContent: 'center' }}>
