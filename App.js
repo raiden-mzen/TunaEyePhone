@@ -1630,7 +1630,7 @@ function Btn({ label, act: a, arg, kind = '', dis = false, icon, style, bar }) {
       accessibilityRole="button" accessibilityLabel={label || icon} accessibilityState={{ disabled: dis }}
       style={({ pressed }) => [
         {
-          minHeight: primary ? 54 : small ? 42 : 48, paddingHorizontal: small ? 14 : 20, borderRadius: 999, borderWidth: ghost ? 0 : 1.5,
+          minHeight: primary ? 54 : small ? 42 : 48, paddingHorizontal: small ? 12 : 16, borderRadius: 999, borderWidth: ghost ? 0 : 1.5,
           borderColor: primary ? C.primary : danger ? '#E9BDBD' : '#D5E0EE',
           backgroundColor: primary ? C.primary : ghost ? 'transparent' : C.surface,
           flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8
@@ -1998,9 +1998,9 @@ function renderWelcome() {
           <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: C.canvas, overflow: 'hidden' }}>
             <View style={{ width: `${Math.min(100, Math.round(((sw.done + 1) / Math.max(1, sw.total)) * 100))}%`, height: '100%', backgroundColor: C.primary, borderRadius: 4 }} />
           </View>
-          <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
-            {B('Background', 'slowWifiBg', '', '', false, '', { flex: 1 })}
-            {B('Keep waiting', 'slowWifiBg', '', 'primary', false, '', { flex: 1 })}
+          <View style={{ gap: 10, width: '100%' }}>
+            {B('Keep waiting', 'slowWifiBg', '', 'primary', false, '', { width: '100%' })}
+            {B('Sync in background', 'slowWifiBg', '', '', false, '', { width: '100%' })}
           </View>
         </ModalFrame>
       ) : null}
@@ -2121,9 +2121,9 @@ screens.grader = () => {
       {gm ? (
         <ModalFrame tone="primary" icon="check" badge="GRADER IDENTITY" title={`Are you ${gm.match.name}?`} subtitle={`Last graded ${gm.match.ago}`} maxWidth={430} zIndex={60}>
           {!gm.addingInitial ? (
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {B('No, start new', 'graderMatchNo', '', '', false, '', { flex: 1 })}
-              {B('Yes, continue', 'graderMatchYes', '', 'primary', false, 'check', { flex: 1 })}
+            <View style={{ gap: 10 }}>
+              {B('Yes, continue', 'graderMatchYes', '', 'primary', false, 'check', { width: '100%' })}
+              {B('No, start new', 'graderMatchNo', '', '', false, '', { width: '100%' })}
             </View>
           ) : (
             <View style={{ gap: 10 }}>
@@ -2998,9 +2998,9 @@ screens.result = () => {
               <Text style={{ color: C.primary, fontSize: 11, fontWeight: '700' }}>Combines both</Text>
             </View>
           </View>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { flex: 1 })}
-            {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { flex: 1.2 })}
+          <View style={{ gap: 10 }}>
+            {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { width: '100%' })}
+            {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { width: '100%' })}
           </View>
         </ModalFrame>
       ) : null}
@@ -3786,12 +3786,13 @@ function overlay() {
   if (S.dialog) {
     const d = S.dialog;
     const hasDanger = d.acts.some((a) => (a.kind || '').includes('danger'));
+    const stack = d.acts.length > 2 || d.acts.some((a) => String(a.label || '').length >= 10);
     const tone = hasDanger ? 'danger' : 'primary';
     const badge = hasDanger ? 'CONFIRM ACTION' : 'NOTICE';
     return (
       <ModalFrame tone={tone} icon={hasDanger ? 'warn' : 'help'} badge={badge} title={d.title} subtitle={d.body} maxWidth={420} zIndex={50}>
-        <View style={{ flexDirection: d.acts.length > 2 ? 'column' : 'row', gap: 10, marginTop: 4 }}>
-          {d.acts.map((a, i) => <React.Fragment key={i}>{B(a.label, a.act, a.arg, a.kind || '', false, '', d.acts.length > 2 ? { width: '100%' } : { flex: 1 })}</React.Fragment>)}
+        <View style={{ flexDirection: stack ? 'column' : 'row', gap: 10, marginTop: 4 }}>
+          {d.acts.map((a, i) => <React.Fragment key={i}>{B(a.label, a.act, a.arg, a.kind || '', false, '', stack ? { width: '100%' } : { flex: 1 })}</React.Fragment>)}
         </View>
       </ModalFrame>
     );
