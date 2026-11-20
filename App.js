@@ -91,6 +91,23 @@ const IMG = {
   core: require('./assets/images/sashiboCoreFull.png'),
   tail: require('./assets/images/tailCutFull.png'),
 };
+const DEMO_IMG = {
+  core: {
+    A: require('./assets/demo_samples/SASHIBOCORE_A.png'),
+    B: require('./assets/demo_samples/SASHIBOCORE_B.png'),
+    C: require('./assets/demo_samples/SASHIBOCORE_C.png'),
+    UNC: require('./assets/demo_samples/SASHIBOCORE_C.png'),
+    INV: require('./assets/images/sashiboCoreFull.png'),
+  },
+  tail: {
+    A: require('./assets/demo_samples/TAILCUT_A.png'),
+    B: require('./assets/demo_samples/TAILCUT_B.png'),
+    C: require('./assets/demo_samples/TAILCUT_C.png'),
+    UNC: require('./assets/demo_samples/TAILCUT_C.png'),
+    INV: require('./assets/images/tailCutFull.png'),
+  },
+};
+const demoAssetFor = (type, code) => (DEMO_IMG[type === 'tail' ? 'tail' : 'core'][code] || IMG[type === 'tail' ? 'tail' : 'core']);
 
 const SAMPLE_AR = { core: 2.05, tail: 1.9 }; // width / height of each sample PNG
 const GC = { A: C.gA, B: C.gB, C: C.gC };
@@ -704,6 +721,7 @@ async function runAnalysis() {
   if (!alive()) return;
 
   const letter = res.letter || res.grade || 'B';
+  const codeKey = res.invalid ? 'INV' : outcome === 'uncertain' ? 'UNC' : letter;
   const cap = {
     id: p.id,
     type: p.type,
@@ -711,7 +729,8 @@ async function runAnalysis() {
     attempt,
     ts: p.ts,
     uri: keptUri,
-    code: res.invalid ? 'INV' : outcome === 'uncertain' ? 'UNC' : letter,
+    demoAsset: p.source === 'demo' || S.demo.enabled ? demoAssetFor(p.type, codeKey) : null,
+    code: codeKey,
     label: res.invalid ? 'Invalid' : letter,
     score: Number.isFinite(confidence) ? confidence : 0,
     scores: res.scores || null,
@@ -1433,11 +1452,13 @@ function TunaImg({ tone, type, blur }) {
     </Svg>
   );
 }
-const toneOf = (c) => (c.code === 'INV' ? 'X' : c.code === 'UNC' ? 'B' : c.label);
-const photo = (uri, tone, type, blur) => uri
+const toneOf = (c) => (c.code === 'INV' ? 'INV' : c.code === 'UNC' ? 'UNC' : c.label);
+const photo = (uri, tone, type, blur, demoAsset) => uri
   ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-  : <TunaImg tone={tone} type={type} blur={blur} />;
-const imgFor = (c, blur) => photo(c.uri, toneOf(c), c.type, blur);
+  : (demoAsset || DEMO_IMG[type]?.[tone])
+    ? <Image source={demoAsset || DEMO_IMG[type][tone]} style={{ width: '100%', height: '100%', backgroundColor: '#FFFFFF' }} resizeMode="contain" />
+    : <TunaImg tone={tone} type={type} blur={blur} />;
+const imgFor = (c, blur) => photo(c.uri, toneOf(c), c.type, blur, c.demoAsset);
 function ImgFrame({ style, children }) {
   return <View style={[{ backgroundColor: '#0F1B2B', borderRadius: 24, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>{children}</View>;
 }
@@ -1853,15 +1874,8 @@ function renderWelcome() {
           </Pressable>
         </View>
         <Text style={{ marginTop: 18, fontSize: 32 * TS(), lineHeight: 36 * TS(), fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>{name ? `${greet},\n${name}` : `${greet}!`}</Text>
-        <Text style={{ marginTop: 6, fontSize: 15 * TS(), lineHeight: 20 * TS(), color: 'rgba(255,255,255,0.88)' }}>Grade yellowfin tuna: Sashibo core first, Tail-Cut if needed.</Text>
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-          {['01 Grader & Weight', '02 Core', '03 Tail (if needed)', '04 Receipt'].map((step) => (
-            <View key={step} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)' }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#fff' }}>{step}</Text>
-            </View>
-          ))}
-        </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
+        <Text style={{ marginTop: 6, fontSize: 15 * TS(), lineHeight: 20 * TS(), color: 'rgba(255,255,255,0.88)' }}>Sashibo core first, Tail-Cut if needed.</Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
           <View style={{ transform: [{ rotate: '-4deg' }] }}><ChamberLine w={220} /></View>
         </View>
       </View>
@@ -1947,14 +1961,14 @@ screens.weight = () => {
       right={[B(editing ? 'Update price' : 'Start capture', 'weightNext', '', 'primary', !chk.ok, 'arrow')]}>
       <View style={[BODY, { gap: 14, paddingTop: 12, paddingBottom: 20 }]}>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {chip(`Order ${s.recordId}`, 'info')}
-          {chip(`Grader: ${s.grader || '—'}`, 'ok', 'check')}
+          {chip(s.recordId, 'info')}
+          {chip(s.grader || '—', 'ok', 'check')}
         </View>
-        <Txt k="title" style={{ fontSize: 30, textAlign: 'center' }}>Weight entry</Txt>
+        <Txt k="title" style={{ fontSize: 30, textAlign: 'center' }}>Weight</Txt>
 
         <Card lift style={{ gap: 12, paddingVertical: 18, paddingHorizontal: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Txt k="label">Fish weight (15–200 kg)</Txt>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: C.text2 }}>15 – 200 kg</Text>
             {B('Clear', 'clearWeight', '', 'small ghost')}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: chk.msg ? C.err : C.primary, borderRadius: 20, paddingHorizontal: 18, minHeight: 74 }}>
@@ -1965,7 +1979,7 @@ screens.weight = () => {
             />
             <Text style={{ fontSize: 20, fontWeight: '700', color: C.text2 }}>kg</Text>
           </View>
-          {chk.msg ? <Text style={{ color: C.err, fontSize: 13 }}>{chk.msg}</Text> : <Txt k="det">Enter 15.0 to 200.0 kg (1 decimal place allowed).</Txt>}
+          {chk.msg ? <Text style={{ color: C.err, fontSize: 13 }}>{chk.msg}</Text> : null}
           <View style={{ gap: 8, marginTop: 4 }}>
             {keys.map((row, idx) => (
               <View key={idx} style={{ flexDirection: 'row', gap: 8 }}>
@@ -1991,31 +2005,15 @@ screens.grader = () => {
     <Shell idx={1} left={[backBtn('cancelSession'), helpBtn()]}
       right={[B('Continue', 'graderNext', '', 'primary', validateGraderName(s.grader).length < 1, 'arrow')]}>
       <View style={[BODY, { gap: 18, paddingTop: 16, paddingBottom: 32 }]}>
-        <View style={{ alignItems: 'center', paddingBottom: 4 }}>
-          <Txt k="title" style={{ fontSize: 32, lineHeight: 38, textAlign: 'center' }}>Grader identity</Txt>
-        </View>
+        <Txt k="title" style={{ fontSize: 32, lineHeight: 38, textAlign: 'center' }}>Who is grading?</Txt>
 
         <Card lift style={{ gap: 16, paddingVertical: 22, paddingHorizontal: 20, borderColor: '#C9D9F7', backgroundColor: '#F8FBFF' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon n="edit" s={27} c="#fff" />
-            </View>
-            <View style={{ flex: 1, gap: 4 }}>
-              <Txt k="label">GRADER NAME (MAX 15 CHARS)</Txt>
-              <Text style={{ fontSize: 24 * ts, fontWeight: '800', color: C.navy }}>Who is grading?</Text>
-              <Txt k="sub">Your records and dashboard filter by this name.</Txt>
-            </View>
-          </View>
           <TextInput
             style={[st.field, { minHeight: 64, borderRadius: 20, fontSize: 22 * ts, fontWeight: '700', paddingHorizontal: 20, borderColor: C.primary, backgroundColor: '#fff' }]}
             value={s.grader} onChangeText={(v) => { s.grader = v.slice(0, 15); render(); }}
             placeholder="Enter your name" placeholderTextColor="#8A99AB"
             autoCapitalize="words" autoCorrect={false} maxLength={15} returnKeyType="done"
           />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {chip('1–15 characters', 'info', 'check')}
-            {chip('Phonetic match check', 'ok')}
-          </View>
         </Card>
       </View>
 
@@ -2067,7 +2065,6 @@ screens.tutorial = () => {
     <Shell idx={2} left={[backBtn('go', 'weight'), helpBtn()]}
       right={[B(step < 3 ? 'Next' : 'Continue', 'tutNext', '', 'primary', false, 'arrow'), B('Close', 'tutClose', '', 'ghost')]}>
       <View style={[BODY, { gap: 16, alignItems: 'center', justifyContent: 'center', paddingBottom: 16 }]}>
-        {chip(`Placement Guide · Step ${step} of 3`, 'info')}
         <ChamberLine w={Math.min(320, Dimensions.get('window').width - 48)} />
         <Card lift style={{ width: '100%', gap: 8, alignItems: 'center' }}>
           <Txt k="h1" style={{ textAlign: 'center' }}>{info.t}</Txt>
@@ -2397,9 +2394,19 @@ function PhoneCam({ type }) {
 }
 const camView = (t) => {
   const showPiStream = !S.demo.enabled && S.camSource === 'pi' && S.phoneLinked && S.piStreamUrl;
+  const demoCode = S.demo.queue.length ? S.demo.queue[0] : S.demo.next;
   return (
     <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>
-      {showPiStream ? (
+      {S.demo.enabled ? (
+        <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#F5F8FE', alignItems: 'center', justifyContent: 'center' }}>
+          <Image source={demoAssetFor(t, demoCode)} style={{ width: '88%', height: '88%' }} resizeMode="contain" />
+          <Brackets size={170} color={C.primary} />
+          <View style={{ position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: C.border, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B' }} />
+            <Text style={{ color: C.navy, fontSize: 12, fontWeight: '700' }}>Demo mode · Sample image</Text>
+          </View>
+        </View>
+      ) : showPiStream ? (
         <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#0F1B2B', alignItems: 'center', justifyContent: 'center' }}>
           <Image source={{ uri: S.piStreamUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           <Brackets size={170} />
@@ -2473,14 +2480,10 @@ screens.camera = () => {
             : B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera'),
       ]}>
       <View style={[BODY, { gap: 10, alignItems: 'center', paddingBottom: 8 }]}>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-          {chip(isTail ? 'Supplementary · Tail cut' : 'Primary · Sashibo core', isTail ? 'amber' : 'info')}
-          {chip(`${s.recordId} · ${fmtKg(s.weightTenths)}`, '')}
-        </View>
+        {chip(`${s.recordId} · ${fmtKg(s.weightTenths)}`, '')}
         <Txt k="title" style={{ fontSize: 30, paddingTop: 2, textAlign: 'center' }}>
           {isTail ? 'Show the tail cut face' : 'Place the core in the frame'}
         </Txt>
-        <Sub>{isTail ? 'Face the cut surface to the camera, centered in the guide.' : 'Lay it flat and centered, in even light.'}</Sub>
         {!S.demo.enabled ? (
           <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
             {B('RPi Stream', 'setCamSource', 'pi', usePiCam ? 'small primary' : 'small', false, 'camera', { flex: 1 })}
@@ -2834,11 +2837,7 @@ screens.override = () => {
     <Shell idx={6} left={[backBtn('cancelOverride'), helpBtn()]}
       right={[has ? B('Remove override', 'clearOverride', '', 'small danger', false, 'x') : null, B('Apply override', 'applyOverride', '', 'primary', !ok, 'check')]}>
       <View style={[BODY, { gap: 16 }]}>
-        <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Manual override</Txt>
-        <Card style={{ flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: C.amberbg, borderColor: '#EBD59C' }}>
-          <Icon n="warn" s={30} c={C.amber} />
-          <Txt k="sub" style={{ flex: 1, color: '#5F3B00' }}>{two ? "Your grade replaces the model's grade for the sample you pick. The model result is kept, and the record is marked as a manual override." : "Your grade replaces the model's grade for the price. The model result is kept, and the record is marked as a manual override."}</Txt>
-        </Card>
+        <Txt k="title" style={{ fontSize: 32, paddingTop: 6, textAlign: 'center' }}>Manual override</Txt>
         {two ? (
           <View style={{ gap: 8 }}>
             <Txt k="h2">Which sample?</Txt>
