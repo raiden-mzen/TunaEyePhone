@@ -3153,7 +3153,7 @@ screens.history = () => {
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {B('Start grading', 'start', '', '', false, 'arrow', { flex: 1, backgroundColor: '#fff', borderColor: '#fff' })}
-            {B(pend ? `Sync (${pend})` : 'Sync', 'goSync', '', '', false, 'refresh', { backgroundColor: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.28)' })}
+            {B(pend ? `Sync (${pend})` : 'Sync', 'goSync', '', '', false, 'refresh', { backgroundColor: '#EEF4FF', borderColor: '#EEF4FF' })}
           </View>
         </View>
 
