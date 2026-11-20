@@ -1471,21 +1471,11 @@ const imgFor = (c, blur) => photo(c.uri, toneOf(c), c.type, blur, c.demoAsset);
 function ImgFrame({ style, children }) {
   return <View style={[{ backgroundColor: '#0F1B2B', borderRadius: 22, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>{children}</View>;
 }
-function Glow() {
-  return (
-    <Svg style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 300 }} width="100%" height={300} pointerEvents="none">
-      <Defs><RadialGradient id="glow" cx="50%" cy="0%" rx="75%" ry="100%"><Stop offset="0" stopColor="#E7EEFC" stopOpacity="1" /><Stop offset="1" stopColor="#F6F8FC" stopOpacity="0" /></RadialGradient></Defs>
-      <Rect width="100%" height={300} fill="url(#glow)" />
-    </Svg>
-  );
-}
-/* blue hero background with soft blobs (welcome, startup, onboarding) */
+function Glow() { return null; }
+/* clean ocean-blue surface (welcome, startup, onboarding) */
 function Hero({ children }) {
   return (
     <View style={{ flex: 1, backgroundColor: C.hero, overflow: 'hidden' }}>
-      <View pointerEvents="none" style={{ position: 'absolute', top: -100, right: -80, width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(93,217,245,0.30)' }} />
-      <View pointerEvents="none" style={{ position: 'absolute', top: 160, left: -120, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-      <View pointerEvents="none" style={{ position: 'absolute', top: 330, right: -90, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.07)' }} />
       {children}
     </View>
   );
@@ -1902,8 +1892,8 @@ function renderWelcome() {
             <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{open ? 'TunaEye Station 01 · Ready' : 'Shift closed'}</Text>
           </Pressable>
         </View>
-        <Text style={{ marginTop: 18, fontSize: 32 * TS(), lineHeight: 36 * TS(), fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>{name ? `${greet},\n${name}` : `${greet}!`}</Text>
-        <Text style={{ marginTop: 6, fontSize: 15 * TS(), lineHeight: 20 * TS(), color: 'rgba(255,255,255,0.88)' }}>Sashibo core first, Tail-Cut if needed.</Text>
+        <Text style={{ marginTop: 18, fontSize: 34 * TS(), lineHeight: 38 * TS(), fontWeight: '800', color: '#fff', letterSpacing: -0.9 }}>{'TunaEye\nStation 01'}</Text>
+        <Text style={{ marginTop: 6, fontSize: 15 * TS(), lineHeight: 20 * TS(), color: 'rgba(255,255,255,0.88)' }}>{name ? `Operator: ${name} · Sashibo core first` : 'Sashibo core first, Tail-Cut if needed.'}</Text>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
           <View style={{ transform: [{ rotate: '-4deg' }] }}><ChamberLine w={220} /></View>
         </View>
