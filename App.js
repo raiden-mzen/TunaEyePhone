@@ -1467,7 +1467,7 @@ const photo = (uri, tone, type, blur, demoAsset) => uri
     : <TunaImg tone={tone} type={type} blur={blur} />;
 const imgFor = (c, blur) => photo(c.uri, toneOf(c), c.type, blur, c.demoAsset);
 function ImgFrame({ style, children }) {
-  return <View style={[{ backgroundColor: '#0F1B2B', borderRadius: 24, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>{children}</View>;
+  return <View style={[{ backgroundColor: '#0F1B2B', borderRadius: 22, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>{children}</View>;
 }
 function Glow() {
   return (
@@ -1536,8 +1536,8 @@ function Stat({ v, l, k }) {
 
 function Card({ lift, style, children }) {
   return (
-    <View style={[{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 28, padding: 18 },
-    lift && { shadowColor: C.navy, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 3 }, style]}>{children}</View>
+    <View style={[{ backgroundColor: C.surface, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 24, padding: 18 },
+    lift && { shadowColor: C.navy, shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 4 }, style]}>{children}</View>
   );
 }
 function KV({ l, r, last, center }) {
@@ -1569,27 +1569,27 @@ function Enter({ children }) {
 function Btn({ label, act: a, arg, kind = '', dis = false, icon, style, bar }) {
   const primary = kind.includes('primary'), danger = kind.includes('danger'), small = kind.includes('small'), ghost = kind.includes('ghost');
   const fg = primary ? '#fff' : danger ? C.err : ghost ? C.text2 : C.primary;
-  const fs = (primary ? 19 : small ? 15 : 17) * TS();
+  const fs = (primary ? 17 : small ? 14 : 16) * TS();
   return (
     <Pressable
       disabled={dis} onPress={() => act(a, arg)}
       accessibilityRole="button" accessibilityLabel={label || icon} accessibilityState={{ disabled: dis }}
       style={({ pressed }) => [
         {
-          minHeight: primary ? 62 : small ? 46 : 52, paddingHorizontal: 22, borderRadius: 999, borderWidth: ghost ? 0 : 2,
-          borderColor: primary ? C.primary : danger ? '#E9BDBD' : C.border,
+          minHeight: primary ? 54 : small ? 42 : 48, paddingHorizontal: small ? 14 : 20, borderRadius: 999, borderWidth: ghost ? 0 : 1.5,
+          borderColor: primary ? C.primary : danger ? '#E9BDBD' : '#D5E0EE',
           backgroundColor: primary ? C.primary : ghost ? 'transparent' : C.surface,
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8
         },
-        primary && !dis && { shadowColor: C.primary, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
+        primary && !dis && { shadowColor: C.primary, shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
         bar && (primary ? { flexBasis: '100%' } : ghost ? { paddingHorizontal: 12 } : { flexGrow: 1, flexBasis: '40%' }),
-        dis && (primary ? { backgroundColor: '#9DB9F5', borderColor: '#9DB9F5', shadowOpacity: 0 } : { opacity: 0.4 }),
-        pressed && !dis && { transform: [{ scale: 0.98 }], backgroundColor: primary ? C.primaryPress : '#EEF3FB' },
+        dis && (primary ? { backgroundColor: '#9DB9F5', borderColor: '#9DB9F5', shadowOpacity: 0 } : { opacity: 0.45 }),
+        pressed && !dis && { transform: [{ scale: 0.985 }], backgroundColor: primary ? C.primaryPress : '#EEF3FB' },
         style,
       ]}
     >
       {label ? <Text style={{ fontSize: fs, fontWeight: '700', color: fg, textAlign: 'center', flexShrink: 1 }}>{label}</Text> : null}
-      {icon ? <Icon n={icon} s={primary ? 24 : 22} c={fg} /> : null}
+      {icon ? <Icon n={icon} s={primary ? 20 : 18} c={fg} /> : null}
     </Pressable>
   );
 }
@@ -1615,23 +1615,39 @@ function Header({ idx }) {
   const dot = S.net === 'online' ? C.online : '#E0A100';
   const home = () => { if (S.session) act('cancelSession'); else if (S.screen !== 'welcome') act('go', 'welcome'); };
   return (
-    <View style={{ paddingHorizontal: 12, paddingTop: 8, gap: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 8, paddingLeft: 14, paddingRight: 8, borderWidth: 1, borderColor: C.border, shadowColor: C.navy, shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}>
-        <Logo s={28} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {/* tap the dot to open the demo controls */}
+    <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4, gap: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 8, paddingLeft: 14, paddingRight: 8, borderWidth: 1, borderColor: '#DCE5F2', shadowColor: C.navy, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}>
+        <Logo s={26} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {S.demo.enabled ? (
+            <Pressable onPress={() => { S.drawer = !S.drawer; render(); }} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#FFF4D6', borderWidth: 1, borderColor: '#EBD59C' }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: C.amber }}>DEMO</Text>
+            </Pressable>
+          ) : null}
           <Pressable hitSlop={12} onPress={() => { S.drawer = !S.drawer; render(); }}><View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dot }} /></Pressable>
-          <Pressable onPress={home} accessibilityRole="button" accessibilityLabel="Home" style={{ width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon n="home" s={18} />
+          <Pressable onPress={home} accessibilityRole="button" accessibilityLabel="Home" style={{ width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', backgroundColor: C.canvas }}>
+            <Icon n="home" s={17} />
           </Pressable>
         </View>
       </View>
       {idx ? (
-        <View style={{ alignItems: 'center', gap: 6 }}>
-          <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
-            {STEPS.map((_, i) => <View key={i} style={{ height: 6, width: i + 1 === idx ? 26 : 6, borderRadius: 3, backgroundColor: i + 1 <= idx ? C.primary : C.border }} />)}
-          </View>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text2 }}>{`Step ${idx} of ${STEPS.length}: ${STEPS[idx - 1]}`}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12, borderWidth: 1, borderColor: '#DCE5F2', alignSelf: 'center', gap: 6, shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 }}>
+          {STEPS.map((label, i) => {
+            const n = i + 1;
+            const done = n < idx;
+            const active = n === idx;
+            return (
+              <React.Fragment key={label}>
+                {i > 0 ? <View style={{ width: 10, height: 2, borderRadius: 1, backgroundColor: done ? C.primary : '#DCE5F2' }} /> : null}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: done ? C.primary : active ? '#EEF4FF' : '#F1F5F9', borderWidth: active ? 2 : 0, borderColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
+                    {done ? <Icon n="check" s={10} c="#fff" w={3} /> : active ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.primary }} /> : null}
+                  </View>
+                  <Text style={{ fontSize: 11.5, fontWeight: active ? '800' : '600', color: active ? C.navy : done ? C.primary : C.text2 }}>{label}</Text>
+                </View>
+              </React.Fragment>
+            );
+          })}
         </View>
       ) : null}
     </View>
@@ -1675,7 +1691,7 @@ function Shell({ idx = 0, left = [], right = [], children }) {
           flexGrow: 1,
           paddingHorizontal: 16,
           // Leave room for the always-visible action bar.
-          paddingBottom: hasBar && !S.navDock ? (barH || 92) + 22 + 16 : 16,
+          paddingBottom: hasBar && !S.navDock ? (barH || 88) + 16 : 16,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -1691,16 +1707,16 @@ function Shell({ idx = 0, left = [], right = [], children }) {
             position: 'absolute',
             left: 0,
             right: 0,
-            bottom: 22,
+            bottom: 0,
             paddingHorizontal: 16,
             paddingTop: 10,
-            paddingBottom: 10,
-            backgroundColor: 'rgba(246,248,252,0.97)',
+            paddingBottom: 14,
+            backgroundColor: 'rgba(255,255,255,0.97)',
             borderTopWidth: 1,
-            borderTopColor: C.border,
+            borderTopColor: '#DCE5F2',
             shadowColor: C.navy,
-            shadowOpacity: 0.10,
-            shadowRadius: 12,
+            shadowOpacity: 0.08,
+            shadowRadius: 16,
             shadowOffset: { width: 0, height: -4 },
             elevation: 8,
           }}
