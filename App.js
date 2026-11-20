@@ -136,7 +136,7 @@ const S = {
     ovGrade: null, ovReason: '', ovAck: false, ovTarget: null, ovPin: '', ovPinError: '', histSel: null, histScope: 'mine', histPage: 0,
   },
   syncModal: null, slowWifiModal: null, graderCheckModal: null, cannotDetermineModal: null, skipReceiptModal: false, tutorialStep: 1,
-  demo: { queue: [], next: 'A', quality: 'ok', printer: 'ok', timeoutOnce: false, cloudFailNext: 0, startupFault: 'none' },
+  demo: { enabled: false, queue: [], next: 'A', quality: 'ok', printer: 'ok', timeoutOnce: false, cloudFailNext: 0, startupFault: 'none' },
   records: [], counter: 7, lastAck: null, syncing: { active: false, done: 0, total: 0 },
   busy: false, picking: false, flash: false, print: null, receiptSaved: false, countdown: 3, paused: false, timers: {}, lock: 0,
 };
@@ -632,7 +632,30 @@ async function runAnalysis() {
     if (!PI_IMAGE_TYPE[p.type]) throw new Error(`Unsupported sample type: ${p.type}`);
     s.job.stage = 1;
     render();
-    res = await gradeWithPi(p.uri, PI_IMAGE_TYPE[p.type], S.piApiUrl);
+    if (S.demo.enabled) {
+      await sleep(700);
+      if (!alive()) return;
+      if (S.demo.timeoutOnce) { S.demo.timeoutOnce = false; throw new Error('timeout'); }
+      const code = S.demo.queue.length ? S.demo.queue.shift() : S.demo.next;
+      if (code === 'INV') {
+        res = { id: 'demo-' + uid(), grade: 'INVALID', letter: null, confidence: 0.15, invalid: true, scores: { GRADE_A: 0.05, GRADE_B: 0.05, GRADE_C: 0.05, INVALID: 0.85 } };
+      } else if (code === 'UNC') {
+        res = { id: 'demo-' + uid(), grade: 'GRADE_C', letter: 'C', confidence: 0.68, invalid: false, scores: { GRADE_A: 0.10, GRADE_B: 0.22, GRADE_C: 0.68, INVALID: 0 } };
+      } else {
+        const g = ['A', 'B', 'C'].includes(code) ? code : 'A';
+        const conf = g === 'A' ? 0.92 : g === 'B' ? 0.88 : 0.84;
+        res = {
+          id: 'demo-' + uid(),
+          grade: 'GRADE_' + g,
+          letter: g,
+          confidence: conf,
+          invalid: false,
+          scores: { GRADE_A: g === 'A' ? conf : 0.06, GRADE_B: g === 'B' ? conf : 0.08, GRADE_C: g === 'C' ? conf : 0.02, INVALID: 0 },
+        };
+      }
+    } else {
+      res = await gradeWithPi(p.uri, PI_IMAGE_TYPE[p.type], S.piApiUrl);
+    }
   } catch (e) {
     if (!alive()) return;
     const msg = piErrorText(e);
@@ -1178,6 +1201,25 @@ const A = {
   },
   capture() { doCapture(); },
   capturePi() { doPiSnapshot(); },
+  demoScan() {
+    const s = S.session; if (!s) return;
+    s.pending = { id: uid(), type: s.sampleType || 'core', ts: Date.now(), uri: null, source: 'demo' };
+    runAnalysis();
+  },
+  toggleDemoMode() {
+    S.demo.enabled = !S.demo.enabled;
+    if (S.demo.enabled) {
+      S.phoneLinked = true;
+      S.piStatus = 'connected';
+      S.kioskId = 'DEMO-01';
+      if (S.session) S.session.phone = 'connected';
+      toast('Demo mode ON — simulated Pi & camera enabled.', 'ok');
+    } else {
+      toast('Demo mode OFF — live Raspberry Pi mode.', 'ok');
+    }
+    render();
+  },
+  openDemoDrawer() { S.drawer = true; render(); },
   uploadImage() { doUpload(); },
   retake() { const s = S.session; s.pending = null; s.job = null; go('camera'); },
   useImage() { runAnalysis(); },
@@ -1835,6 +1877,7 @@ function renderWelcome() {
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           {B('How it works', 'showOnboarding', '', 'ghost', false, 'info')}
+          {B(S.demo.enabled ? 'Demo: ON' : 'Demo', 'openDemoDrawer', '', S.demo.enabled ? 'small primary' : 'ghost')}
           {B(pend ? `Sync (${pend})` : 'Sync', 'goSync', '', 'ghost', false, 'refresh')}
         </View>
       </View>
@@ -2398,9 +2441,10 @@ screens.camera = () => {
   return (
     <Shell idx={isTail ? 4 : 3} left={[backBtn('go', isTail ? 'result' : 'grader'), helpBtn()]}
       right={[
+        S.demo.enabled ? B('Demo scan', 'demoScan', '', 'primary', S.busy || S.picking, 'camera') : null,
         B('Upload image', 'uploadImage', '', '', S.busy || S.picking, 'gallery'),
         B('Pi camera', 'capturePi', '', '', S.busy || S.picking || !linked, 'camera'),
-        B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera'),
+        !S.demo.enabled ? B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera') : null,
       ]}>
       <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -3374,9 +3418,42 @@ function DBtn({ label, on, onPress }) {
     </Pressable>
   );
 }
+function demoJump(scr) {
+  S.drawer = false;
+  S.demo.enabled = true;
+  S.phoneLinked = true;
+  S.piStatus = 'connected';
+  S.kioskId = 'DEMO-01';
+  if (scr === 'welcome' || scr === 'history') { go(scr); return; }
+  if (!S.session) newSession();
+  const s = S.session;
+  s.phone = 'connected';
+  if (!s.grader) { s.grader = 'Demo Grader'; S.lastGrader = 'Demo Grader'; }
+  if (!s.weightTenths) { s.weightStr = '42.5'; s.weightTenths = 425; }
+  if (['result', 'paired', 'override', 'receipt', 'completion'].includes(scr) && !s.captures.length) {
+    s.captures.push({ id: uid(), type: 'core', outcome: 'uncertain', attempt: 1, ts: Date.now(), uri: null, code: 'UNC', label: 'C', score: 0.742, scores: { GRADE_A: 0.08, GRADE_B: 0.18, GRADE_C: 0.74, INVALID: 0 }, inferMs: 500 });
+  }
+  if (scr === 'paired' && s.captures.length < 2) {
+    s.captures.push({ id: uid(), type: 'tail', outcome: 'accepted', attempt: 1, ts: Date.now(), uri: null, code: 'B', label: 'B', score: 0.914, scores: { GRADE_A: 0.06, GRADE_B: 0.91, GRADE_C: 0.03, INVALID: 0 }, inferMs: 500 });
+  }
+  if (scr === 'receipt' || scr === 'completion') {
+    if (!s.quote) {
+      const p = priceFor(s);
+      const g = p.ok ? p.grade : 'B';
+      const rate = S.schedule.rates[g];
+      const r = persist(s);
+      r.quote = { grade: g, rateC: rate, weightTenths: s.weightTenths, totalC: calcTotalCentavos(s.weightTenths, rate), scheduleVersion: S.schedule.version, scheduleId: S.schedule.id, revision: 1, confirmedAt: Date.now(), rounding: 'half-up to centavo' };
+      r.closed = true;
+      s.quote = r.quote;
+    }
+  }
+  go(scr);
+}
 function demoAct(d) {
   const [k, v] = d.split(':'); const D = S.demo;
   if (k === 'close') { S.drawer = false; render(); return; }
+  if (k === 'mode') { A.toggleDemoMode(); return; }
+  if (k === 'jump') { demoJump(v); return; }
   if (k === 'net') { const was = S.net; S.net = v; if (v === 'online' && was !== 'online') { S.toast = { msg: 'Checking cloud access…' }; render(); setTimeout(() => { S.toast = null; render(); }, 900); } }
   else if (k === 'next') { D.next = v; D.queue = []; }
   else if (k === 'q') D.queue = v.split(',');
@@ -3408,7 +3485,13 @@ function Drawer() {
     <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 340, maxWidth: '100%', backgroundColor: C.chromeBg, borderLeftWidth: 1, borderLeftColor: C.chromeBorder, zIndex: 20 }}>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ fontWeight: '700', fontSize: 14, color: C.chromeText }}>Demo controls</Text>{b('Close', 0, 'close')}</View>
-        {p('These switch fixtures for testing every state. They are not part of the kiosk.')}
+        {p('Enable Demo mode to simulate Pi inference & camera, or jump to any screen.')}
+        {h3('Demo mode')}{grp([b('Demo ON', D.enabled, 'mode:on'), b('Demo OFF (Live Pi)', !D.enabled, 'mode:off')])}
+        {h3('Jump to screen')}{grp([
+          ['welcome', 'Welcome'], ['grader', 'Grader'], ['weight', 'Weight'], ['tutorial', 'Tutorial'],
+          ['pair', 'Connect'], ['camera', 'Camera'], ['result', 'Result'], ['paired', 'Final Combined'],
+          ['override', 'Override'], ['receipt', 'Receipt'], ['completion', 'Completion'], ['history', 'Dashboard'],
+        ].map(([scr, label]) => b(label, S.screen === scr, 'jump:' + scr)))}
         {h3('Connectivity')}{grp([b('Online', S.net === 'online', 'net:online'), b('Offline', S.net === 'offline', 'net:offline'), b('Wi-Fi, no cloud', S.net === 'wifi', 'net:wifi')])}
         {h3('Next capture result')}{grp([['A', 'Grade A'], ['B', 'Grade B'], ['C', 'Grade C'], ['UNC', 'Uncertain'], ['INV', 'Invalid']].map((x) => b(x[1], D.next === x[0] && q0, 'next:' + x[0])))}
         {h3('Scenario presets')}{grp([b('Paired agree (A, A)', 0, 'q:A,A'), b('Paired conflict (A, B)', 0, 'q:A,B'), b('Uncertain, then A', 0, 'q:UNC,A'), b('Invalid, then B', 0, 'q:INV,B')])}
