@@ -77,7 +77,7 @@ async function loadFonts() {
 /* ====================================================================== */
 const C = {
   pageBg: '#E6ECF3', chromeBg: '#FFFFFF', chromeText: '#173B6C', chromeSub: '#536477', chromeBorder: '#D2DCE8',
-  canvas: '#F6F8FC', surface: '#FFFFFF', primary: '#2563EB', primaryPress: '#1D4FD8', navy: '#173B6C',
+  canvas: '#EEF3FA', surface: '#FFFFFF', primary: '#2563EB', primaryPress: '#1D4FD8', navy: '#173B6C',
   text2: '#5B6B80', border: '#E1E8F2', blue: '#2563EB', cyan: '#5DD9F5', online: '#22B573',
   hero: '#1F5CFF', heroSoft: 'rgba(255,255,255,0.18)',
   gA: '#176B4B', gB: '#8A5900', gC: '#9A3C29', gAbg: '#E3F4EC', gBbg: '#FBF0D9', gCbg: '#F9E5E0',
@@ -149,7 +149,7 @@ const S = {
   startup: { state: 'idle', checks: [], fail: null },
   session: null, auth: null, login: null, dialog: null, toast: null, help: false, drawer: false, navDock: false,
   onboarded: false, onbStep: 0, phoneLinked: false, piStatus: 'disconnected', piApiUrl: PI_CONFIG.apiUrl, piUrlDraft: PI_CONFIG.apiUrl, piStreamUrl: derivePiCameraUrls(PI_CONFIG.apiUrl).streamUrl, piSnapshotUrl: derivePiCameraUrls(PI_CONFIG.apiUrl).snapshotUrl, camSource: 'pi', camReady: false, kioskId: '', scanError: '', lastGrader: '',
-  tips: true, coached: {}, barH: 0,
+  tips: false, coached: {}, barH: 0,
   ui: {
     large: false, batchOpen: false, recFilter: 'all', recSearch: '', recSel: null, reviewGrade: null, reviewReason: '', expertCtx: null,
     ovGrade: null, ovReason: '', ovAck: false, ovTarget: null, ovPin: '', ovPinError: '', histSel: null, histScope: 'mine', histPage: 0,
@@ -1687,7 +1687,7 @@ function Shell({ idx = 0, left = [], right = [], children }) {
           flexGrow: 1,
           paddingHorizontal: 16,
           // Leave room for the always-visible action bar.
-          paddingBottom: hasBar && !S.navDock ? (barH || 88) + 16 : 16,
+          paddingBottom: hasBar && !S.navDock ? (barH || 92) + 28 : 24,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -2464,10 +2464,10 @@ const camView = (t) => {
   return (
     <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>
       {S.demo.enabled ? (
-        <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#F5F8FE', alignItems: 'center', justifyContent: 'center' }}>
-          <Image source={demoAssetFor(t, demoCode)} style={{ width: '88%', height: '88%' }} resizeMode="contain" />
-          <Brackets size={170} color={C.primary} />
-          <View style={{ position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: C.border, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+          <Image source={demoAssetFor(t, demoCode)} style={{ width: '92%', height: '92%' }} resizeMode="contain" />
+          <Brackets size={220} w={5} color={C.primary} />
+          <View style={{ position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(248,250,252,0.95)', borderWidth: 1, borderColor: '#DCE5F2', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B' }} />
             <Text style={{ color: C.navy, fontSize: 12, fontWeight: '700' }}>Demo mode · Sample image</Text>
           </View>
@@ -2734,9 +2734,9 @@ screens.result = () => {
         {tailPrompt ? (
           <Card style={{ gap: 10 }}>
             <Txt k="h2">Is a Tail-Cut sample available?</Txt>
-            <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-              {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { flex: 1 })}
-              {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { flex: 1 })}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { flex: 1, paddingHorizontal: 12 })}
+              {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { flex: 1, paddingHorizontal: 12 })}
             </View>
           </Card>
         ) : (
