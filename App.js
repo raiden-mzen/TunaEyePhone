@@ -434,23 +434,36 @@ function openWelcomeSyncModal() {
 async function runStartup() {
   const tok = uid(); S.startup = { tok, state: 'running', checks: [], fail: null }; S.screen = 'startup'; render();
   const f = S.demo.startupFault;
-  let piOk = true;
-  try { await checkPiStatus(S.piApiUrl); S.piStatus = 'connected'; } catch (e) { piOk = false; S.piStatus = 'error'; }
-  const list = [
+  const piProbe = S.demo.enabled
+    ? Promise.resolve(true)
+    : Promise.race([
+      checkPiStatus(S.piApiUrl, 1).then(() => true),
+      sleep(1000).then(() => false),
+    ]).catch(() => false);
+  const fastChecks = [
     ['Phone link', f === 'camera' ? { ok: false, msg: 'Phone link not responding' } : { ok: true, msg: 'Ready to pair' }],
-    ['Raspberry Pi', { ok: piOk, msg: piOk ? `Connected (${S.piApiUrl})` : `Not reachable (${S.piApiUrl})`, soft: true, warn: !piOk }],
     ['Storage', { ok: true, msg: 'Writable' }],
     ['Shift', { ok: S.shift.open, msg: S.shift.open ? 'Open' : 'Closed', soft: true }],
-    ['Printer', { ok: true, msg: 'Not confirmed in demo', soft: true, warn: true }],
     ['Cloud', { ok: cloudOk() && isSupabaseConfigured(), msg: !isSupabaseConfigured() ? 'Not configured • saving on device' : cloudOk() ? 'Reachable' : 'Offline • saving on device', soft: true, warn: !cloudOk() || !isSupabaseConfigured() }],
   ];
-  for (const [name, res] of list) {
-    await sleep(380); if (S.startup.tok !== tok || S.screen !== 'startup') return;
+  for (const [name, res] of fastChecks) {
+    await sleep(60); if (S.startup.tok !== tok || S.screen !== 'startup') return;
     S.startup.checks.push({ name, ...res });
     if (!res.ok && !res.soft) { S.startup.state = 'fail'; S.startup.fail = `${name}: ${res.msg}`; render(); return; }
     render();
   }
-  await sleep(500); if (S.startup.tok !== tok || S.screen !== 'startup') return;
+  const piOk = await piProbe;
+  if (S.startup.tok !== tok || S.screen !== 'startup') return;
+  S.piStatus = piOk ? 'connected' : 'error';
+  S.startup.checks.push({
+    name: 'Raspberry Pi',
+    ok: piOk,
+    msg: piOk ? `Connected (${S.piApiUrl})` : `Not reachable (${S.piApiUrl})`,
+    soft: true,
+    warn: !piOk,
+  });
+  render();
+  await sleep(150); if (S.startup.tok !== tok || S.screen !== 'startup') return;
   S.startup.state = 'ok'; go(S.onboarded ? 'welcome' : 'onboarding');
 }
 
