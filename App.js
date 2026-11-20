@@ -1877,27 +1877,36 @@ screens.startup = () => {
   const st = S.startup, failed = st.state === 'fail';
   return (
     <Hero>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 20 }}>
-        <View style={{ backgroundColor: '#fff', borderRadius: 24, padding: 10 }}><Mark s={60} /></View>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 22 }}>
+        <View style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.16)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: failed ? '#FFB4B4' : C.cyan }} />
+          <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#fff', letterSpacing: 0.8 }}>{failed ? 'STATION CHECK FAILED' : 'STATION BOOT'}</Text>
+        </View>
+        <View style={{ backgroundColor: '#fff', borderRadius: 26, padding: 12, shadowColor: '#0A1930', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}><Mark s={58} /></View>
         <Txt k="title" style={{ fontSize: 34, lineHeight: 38, color: '#fff' }}>TunaEye</Txt>
         <ChamberLine w={200} />
         {failed ? (
           <View style={{ gap: 12, alignItems: 'center' }}>
             {chip('Not ready', 'err', 'x')}
-            <Txt style={{ color: '#fff' }}>{st.fail}</Txt>
+            <Txt style={{ color: '#fff', textAlign: 'center', fontWeight: '600' }}>{st.fail}</Txt>
             <Txt k="sub" style={{ textAlign: 'center', color: 'rgba(255,255,255,0.85)' }}>Check the connection or restart the chamber, then try again.</Txt>
             {B('Check again', 'retryStartup', '', 'small')}
           </View>
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}><Spin size={36} bw={4} light /><Txt style={{ color: '#fff' }}>Getting things ready…</Txt></View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.14)' }}>
+            <Spin size={26} bw={3.5} light />
+            <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '700' }}>Getting things ready…</Text>
+          </View>
         )}
-        <View style={{ minHeight: 150, gap: 8, alignItems: 'flex-start', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 16, alignSelf: 'stretch', maxWidth: 360 }}>
+        <View style={{ minHeight: 148, gap: 10, backgroundColor: 'rgba(10,25,48,0.28)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', borderRadius: 22, paddingVertical: 14, paddingHorizontal: 16, alignSelf: 'stretch', maxWidth: 360, alignSelf: 'center' }}>
           {st.checks.map((c) => {
             const soft = c.warn || c.soft;
             return (
-              <View key={c.name} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Icon n={c.ok ? 'check' : soft ? 'warn' : 'x'} s={20} c={c.ok ? '#9CF2C8' : soft ? '#FFD98A' : '#FFB4B4'} />
-                <Text style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.85)', flexShrink: 1 }}><Text style={{ fontWeight: '700', color: '#fff' }}>{c.name}</Text>{` · ${c.msg}`}</Text>
+              <View key={c.name} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c.ok ? 'rgba(91,227,163,0.2)' : soft ? 'rgba(255,217,138,0.2)' : 'rgba(255,180,180,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon n={c.ok ? 'check' : soft ? 'warn' : 'x'} s={14} c={c.ok ? '#9CF2C8' : soft ? '#FFD98A' : '#FFB4B4'} w={2.8} />
+                </View>
+                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.88)', flexShrink: 1 }}><Text style={{ fontWeight: '800', color: '#fff' }}>{c.name}</Text>{` · ${c.msg}`}</Text>
               </View>
             );
           })}
@@ -2537,22 +2546,37 @@ screens.pair = () => {
   const s = S.session, ok = s.phone === 'connected';
   return (
     <Shell idx={2} left={[backBtn('go', 'grader'), helpBtn()]} right={[B('Continue', 'pairNext', '', 'primary', !ok, 'arrow')]}>
-      <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
-        <Txt k="title" style={{ fontSize: 30, paddingTop: 4, textAlign: 'center' }}>Connect to Raspberry Pi</Txt>
-        <Sub>Scan the RPi QR code (10.42.0.1:5000) or tap a preset below.</Sub>
+      <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 10 }]}>
+        <View style={{ width: '100%', backgroundColor: ok ? C.gA : C.navy, borderRadius: 24, padding: 18, gap: 6, shadowColor: C.navy, shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.16)' }}>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: ok ? '#5BE3A3' : C.cyan }} />
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 0.7 }}>{ok ? 'STATION LINKED' : 'RASPBERRY PI'}</Text>
+            </View>
+            <Text style={{ fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.75)', fontFamily: MONO }}>10.42.0.1:5000</Text>
+          </View>
+          <Text style={{ fontSize: 26 * TS(), fontWeight: '800', color: '#fff', marginTop: 4 }}>{ok ? 'Station connected' : 'Connect to Raspberry Pi'}</Text>
+          <Text style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.82)' }}>{ok ? 'Ready to stream camera and grade samples.' : 'Scan the kiosk QR code or enter the Pi URL below.'}</Text>
+        </View>
         {ok ? (
-          <Card lift style={{ width: '100%', alignItems: 'center', gap: 10, backgroundColor: C.gAbg, borderColor: '#BFE3D2', paddingVertical: 28 }}>
-            <Icon n="check" s={56} c={C.gA} w={3} /><Txt k="h2" style={{ color: C.gA }}>Connected</Txt>
-            <Txt k="sub" style={{ color: C.gA, textAlign: 'center' }}>{`${S.kioskId || 'KIOSK-01'} · ${S.piApiUrl}`}</Txt>
+          <Card lift style={{ width: '100%', alignItems: 'center', gap: 12, backgroundColor: C.gAbg, borderColor: '#BFE3D2', paddingVertical: 26 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff', borderWidth: 2, borderColor: '#BFE3D2', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon n="check" s={36} c={C.gA} w={3} />
+            </View>
+            <Txt k="h2" style={{ color: C.gA }}>Connected</Txt>
+            <Txt k="sub" style={{ color: C.gA, textAlign: 'center', fontWeight: '600' }}>{`${S.kioskId || 'KIOSK-01'} · ${S.piApiUrl}`}</Txt>
             {S.piStreamUrl ? <Txt k="det" style={{ color: C.gA }}>{`Camera: ${S.piSnapshotUrl}`}</Txt> : null}
-            {B('Disconnect / change', 'repair', '', 'small ghost')}
+            {B('Disconnect / change', 'repair', '', 'small')}
           </Card>
         ) : (
           <>
             <Scanner />
             {S.scanError ? chip(S.scanError, 'err', 'warn', { alignSelf: 'center' }) : null}
-            <Card style={{ width: '100%', gap: 10 }}>
-              <Txt k="label">Direct Raspberry Pi URL</Txt>
+            <Card lift style={{ width: '100%', gap: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Txt k="label">Direct Raspberry Pi URL</Txt>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: C.primary }}>PORT 5000</Text>
+              </View>
               <TextInput
                 value={S.piUrlDraft}
                 onChangeText={(v) => act('setPiUrlDraft', v)}
@@ -2562,9 +2586,9 @@ screens.pair = () => {
                 autoCorrect={false}
                 keyboardType="url"
                 style={{
-                  borderWidth: 1, borderColor: C.border, borderRadius: 12,
-                  paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 * TS(),
-                  color: C.navy, backgroundColor: C.canvas, fontFamily: MONO,
+                  borderWidth: 1.5, borderColor: '#C9D9F7', borderRadius: 14,
+                  paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 * TS(),
+                  color: C.navy, backgroundColor: '#F7FAFF', fontFamily: MONO,
                 }}
               />
               {B(S.piStatus === 'connecting' ? 'Connecting…' : 'Connect to Raspberry Pi', 'connectPiUrl', '', 'primary', S.piStatus === 'connecting', 'arrow')}
@@ -2745,18 +2769,31 @@ function DemoPill({ label, a, icon = 'camera' }) {
 /* Step 4: shows the top-down illustration (SAMPLETOPDOWN.png) so the grader knows how to place the sample */
 screens.align = () => {
   const s = S.session;
-  const w = Math.min(360, Dimensions.get('window').width - 40);
+  const w = Math.min(310, Dimensions.get('window').width - 76);
   return (
     <Shell idx={4} left={[backBtn('go', 'pair'), helpBtn()]} right={[B('Looks good', 'go', 'camera', 'primary', false, 'arrow')]}>
-      <View style={[BODY, { gap: 14, alignItems: 'center', paddingBottom: 8 }]}>
-        <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Line it up</Txt>
-        <Sub>Place the sample in the tray like this, cut face up and inside the outline.</Sub>
-        <View style={{ width: w }}>
-          <ChamberLine w={w} />
-          <View pointerEvents="none" style={{ position: 'absolute', top: '16%', bottom: '16%', left: '18%', right: '18%', borderWidth: 4, borderStyle: 'dashed', borderColor: 'rgba(93,217,245,0.95)', borderRadius: 36 }} />
+      <View style={[BODY, { gap: 14, alignItems: 'center', paddingBottom: 10 }]}>
+        <View style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, backgroundColor: '#EEF4FF', borderWidth: 1, borderColor: '#C9D9F7' }}>
+          <Text style={{ fontSize: 11.5, fontWeight: '800', color: C.primary, letterSpacing: 0.6 }}>{`ALIGN · ${TYPES[s.sampleType].name.toUpperCase()}`}</Text>
         </View>
-        {chip(`Sample: ${TYPES[s.sampleType].name}`, '', 'tag', { alignSelf: 'center' })}
-        {chip('Center it inside the outline', 'info', 'check', { alignSelf: 'center' })}
+        <Txt k="title" style={{ fontSize: 32, textAlign: 'center' }}>Line it up</Txt>
+        <Sub>Place the sample flat in the tray, cut face up inside the outline.</Sub>
+        <View style={{ width: '100%', backgroundColor: C.primary, borderRadius: 26, padding: 18, alignItems: 'center', justifyContent: 'center', shadowColor: C.primary, shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 5 }}>
+          <View style={{ width: w }}>
+            <ChamberLine w={w} />
+            <View pointerEvents="none" style={{ position: 'absolute', top: '16%', bottom: '16%', left: '18%', right: '18%', borderWidth: 3.5, borderStyle: 'dashed', borderColor: '#22B573', borderRadius: 28 }} />
+          </View>
+        </View>
+        <Card lift style={{ width: '100%', flexDirection: 'row', gap: 10, paddingVertical: 14 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.canvas, borderRadius: 14, padding: 10 }}>
+            <Icon n="check" s={16} c={C.online} w={2.8} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy, flexShrink: 1 }}>Cut face up</Text>
+          </View>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.canvas, borderRadius: 14, padding: 10 }}>
+            <Icon n="check" s={16} c={C.online} w={2.8} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy, flexShrink: 1 }}>Centered inside</Text>
+          </View>
+        </Card>
       </View>
     </Shell>
   );
@@ -2778,23 +2815,34 @@ screens.camera = () => {
             : B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera'),
       ]}>
       <View style={[BODY, { gap: 10, alignItems: 'center', paddingBottom: 12 }]}>
-        <Txt k="title" style={{ fontSize: 28, paddingTop: 2, textAlign: 'center' }}>
-          {isTail ? 'Show the tail cut face' : 'Place the core in the frame'}
-        </Txt>
-        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: '#DCE5F2' }}>
-            <Text style={{ fontSize: 10.5, fontWeight: '700', color: C.text2, letterSpacing: 0.6 }}>ORDER</Text>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: C.navy }} numberOfLines={1}>{s.recordId}</Text>
+        <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Txt k="title" style={{ fontSize: 25, flex: 1 }}>
+            {isTail ? 'Show tail cut face' : 'Place core in frame'}
+          </Txt>
+          <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: S.demo.enabled ? C.amberbg : '#EEF4FF', borderWidth: 1, borderColor: S.demo.enabled ? '#EBD59C' : '#C9D9F7' }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: S.demo.enabled ? C.amber : C.primary }}>{S.demo.enabled ? 'DEMO' : usePiCam ? 'PI CAM' : 'PHONE CAM'}</Text>
           </View>
-          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: '#DCE5F2' }}>
-            <Text style={{ fontSize: 10.5, fontWeight: '700', color: C.text2, letterSpacing: 0.6 }}>WEIGHT</Text>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: C.navy }}>{fmtKg(s.weightTenths)}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+          <View style={{ flex: 1.2, backgroundColor: '#fff', borderRadius: 16, padding: 10, borderWidth: 1, borderColor: '#DCE5F2' }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: C.text2, letterSpacing: 0.7 }}>ORDER</Text>
+            <Text style={{ fontSize: 14.5, fontWeight: '800', color: C.navy }} numberOfLines={1}>{s.recordId}</Text>
+          </View>
+          <View style={{ flex: 0.8, backgroundColor: '#fff', borderRadius: 16, padding: 10, borderWidth: 1, borderColor: '#DCE5F2' }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: C.text2, letterSpacing: 0.7 }}>WEIGHT</Text>
+            <Text style={{ fontSize: 14.5, fontWeight: '800', color: C.navy }}>{fmtKg(s.weightTenths)}</Text>
           </View>
         </View>
         {!S.demo.enabled ? (
-          <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-            {B('RPi Stream', 'setCamSource', 'pi', usePiCam ? 'small primary' : 'small', false, 'camera', { flex: 1 })}
-            {B('Phone Camera', 'setCamSource', 'phone', !usePiCam ? 'small primary' : 'small', false, 'camera', { flex: 1 })}
+          <View style={{ flexDirection: 'row', width: '100%', backgroundColor: '#DCE5F2', borderRadius: 999, padding: 4, gap: 4 }}>
+            <Pressable onPress={() => act('setCamSource', 'pi')} style={{ flex: 1, height: 38, borderRadius: 999, backgroundColor: usePiCam ? C.primary : 'transparent', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Icon n="camera" s={15} c={usePiCam ? '#fff' : C.navy} />
+              <Text style={{ fontSize: 13, fontWeight: '800', color: usePiCam ? '#fff' : C.navy }}>RPi Stream</Text>
+            </Pressable>
+            <Pressable onPress={() => act('setCamSource', 'phone')} style={{ flex: 1, height: 38, borderRadius: 999, backgroundColor: !usePiCam ? C.primary : 'transparent', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Icon n="camera" s={15} c={!usePiCam ? '#fff' : C.navy} />
+              <Text style={{ fontSize: 13, fontWeight: '800', color: !usePiCam ? '#fff' : C.navy }}>Phone Camera</Text>
+            </Pressable>
           </View>
         ) : null}
         {camView(t)}
@@ -2816,11 +2864,19 @@ screens.review = () => {
   return (
     <Shell idx={p.type === 'tail' ? 4 : 3} left={[backBtn('retake'), B('Retake', 'retake', '', 'ghost', false, 'refresh'), helpBtn()]} right={[B('Use image', 'useImage', '', 'primary', false, 'check')]}>
       <View style={[BODY, { paddingBottom: 12, gap: 12 }]}>
-        <Txt k="title" style={{ fontSize: 28, textAlign: 'center' }}>Use this image?</Txt>
-        <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>{photo(p.uri, tone, p.type, bad)}</ImgFrame>
+        <View style={{ alignItems: 'center', gap: 4 }}>
+          <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#EEF4FF', borderWidth: 1, borderColor: '#C9D9F7' }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: C.primary, letterSpacing: 0.6 }}>REVIEW CAPTURE</Text>
+          </View>
+          <Txt k="title" style={{ fontSize: 28, textAlign: 'center' }}>Use this image?</Txt>
+        </View>
+        <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3, borderWidth: 2, borderColor: '#DCE5F2' }}>{photo(p.uri, tone, p.type, bad)}</ImgFrame>
         <Card lift style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.navy }}>{TYPES[p.type].name}</Text>
-          {chip('Ready', 'ok', 'check')}
+          <View>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: C.text2, letterSpacing: 0.5 }}>SAMPLE TYPE</Text>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: C.navy }}>{TYPES[p.type].name}</Text>
+          </View>
+          {chip('Ready for AI', 'ok', 'check')}
         </Card>
       </View>
     </Shell>
@@ -2830,36 +2886,51 @@ screens.review = () => {
 screens.analysis = () => {
   const s = S.session, j = s.job || { stage: 0, state: 'run' }, p = s.pending;
   const sampleLabel = p ? TYPES[p.type].name : 'Sashibo core';
+  const failed = j.state === 'timeout' || j.state === 'error';
   const rail = ['Capture', 'Analyze', 'Result'].map((n, i) => {
     const done = i === 0 || (i === 1 && j.stage >= 2), on = (i === 1 && j.stage < 2) || (i === 2 && j.stage >= 2);
     const col = done ? C.gA : on ? C.primary : C.text2;
     return (
       <React.Fragment key={n}>
-        {i ? <View style={{ width: 22, height: 3, backgroundColor: C.border, borderRadius: 2 }} /> : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          {done ? <Icon n="check" s={22} c={col} w={3} /> : null}
-          <Text style={{ fontSize: 14 * TS(), fontWeight: '600', color: col }}>{n}</Text>
+        {i ? <View style={{ flex: 1, maxWidth: 26, height: 3, backgroundColor: done ? C.gA : C.border, borderRadius: 2 }} /> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: done ? C.gAbg : on ? '#EEF4FF' : '#F1F5F9', borderWidth: 1.5, borderColor: done ? C.gA : on ? C.primary : C.border, alignItems: 'center', justifyContent: 'center' }}>
+            {done ? <Icon n="check" s={12} c={C.gA} w={3} /> : <Text style={{ fontSize: 11, fontWeight: '800', color: col }}>{i + 1}</Text>}
+          </View>
+          <Text style={{ fontSize: 13 * TS(), fontWeight: '700', color: col }}>{n}</Text>
         </View>
       </React.Fragment>
     );
   });
   return (
     <Bare>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18, paddingHorizontal: 22 }}>
-        <ImgFrame style={{ width: 260, height: 195 }}>{p ? photo(p.uri, 'X', p.type) : null}</ImgFrame>
-        {(j.state === 'timeout' || j.state === 'error') ? (
-          <>
-            {chip(j.state === 'error' ? 'Could not grade' : 'Taking longer than expected', 'amber', 'warn')}
-            <Txt style={{ textAlign: 'center', maxWidth: 420 }}>{j.msg || 'The analysis did not finish in time. Try again or retake.'}</Txt>
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%', maxWidth: 360 }}>{B('Retake', 'retake', '', '', '', '', { flex: 1 })}{B('Try again', 'retryAnalysis', '', 'primary', '', '', { flex: 1 })}</View>
-          </>
-        ) : (
-          <View style={{ alignItems: 'center', gap: 12 }}>
-            <Spin />
-            <Txt k="h1" style={{ textAlign: 'center' }}>{`Reading ${sampleLabel.toLowerCase()}…`}</Txt>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 22 }}>
+        <View style={{ width: '100%', maxWidth: 340, backgroundColor: C.navy, borderRadius: 28, padding: 18, gap: 14, alignItems: 'center', shadowColor: C.navy, shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}>
+          <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.14)' }}>
+            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: failed ? '#FFB4B4' : C.cyan }} />
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 0.7 }}>{failed ? 'ANALYSIS PAUSED' : 'AI GRADING'}</Text>
           </View>
-        )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>{rail}</View>
+          <ImgFrame style={{ width: '100%', height: 195, borderRadius: 18 }}>{p ? photo(p.uri, 'X', p.type) : null}</ImgFrame>
+          {!failed ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 }}>
+              <Spin size={30} bw={3.5} light />
+              <Text style={{ fontSize: 17 * TS(), fontWeight: '800', color: '#fff' }}>{`Reading ${sampleLabel.toLowerCase()}…`}</Text>
+            </View>
+          ) : null}
+        </View>
+        {failed ? (
+          <Card lift style={{ width: '100%', maxWidth: 340, gap: 12, alignItems: 'center' }}>
+            {chip(j.state === 'error' ? 'Could not grade' : 'Taking longer than expected', 'amber', 'warn')}
+            <Txt style={{ textAlign: 'center', fontSize: 14 }}>{j.msg || 'The analysis did not finish in time. Try again or retake.'}</Txt>
+            <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+              {B('Retake', 'retake', '', '', false, '', { flex: 1 })}
+              {B('Try again', 'retryAnalysis', '', 'primary', false, 'refresh', { flex: 1 })}
+            </View>
+          </Card>
+        ) : null}
+        <Card style={{ width: '100%', maxWidth: 340, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16 }}>
+          {rail}
+        </Card>
       </View>
     </Bare>
   );
@@ -3013,12 +3084,14 @@ screens.invalid = () => {
   const hasOther = s.captures.some((x) => x.id !== c.id && x.outcome === 'accepted');
   return (
     <Shell idx={5} left={[backBtn('go', 'grader'), helpBtn()]} right={[hasOther ? B('Discard sample', 'discardSample', '', 'small danger') : null, !inv ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Retake', 'retakeSaved', '', 'primary', false, 'refresh')]}>
-      <View style={[BODY, { paddingBottom: 8, gap: 10 }]}>
-        <Card lift style={{ alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: inv ? C.warnbg : C.amberbg }}>
-          {inv ? chip('Image rejected', '', 'warn') : chip('Needs another look', 'amber', 'warn')}
-          <Icon n={inv ? 'x' : 'help'} s={72} c={inv ? C.warn : C.amber} w={1.8} />
-          <Txt k="title" style={{ textAlign: 'center' }}>{inv ? "Can't grade this image" : 'Result is uncertain'}</Txt>
-          <Txt style={{ maxWidth: 480, textAlign: 'center' }}>{inv ? "It doesn't show a usable tuna sample. This is a rejected image, not a Grade C." : 'The model could not decide with enough certainty. Retake the image, override the grade manually, or ask an expert to review it.'}</Txt>
+      <View style={[BODY, { paddingBottom: 12, gap: 12 }]}>
+        <Card lift style={{ alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 22, backgroundColor: inv ? C.errbg : C.amberbg, borderColor: inv ? '#F2C6C6' : '#EBD59C' }}>
+          <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: '#fff', borderWidth: 2, borderColor: inv ? '#F2C6C6' : '#EBD59C', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon n={inv ? 'x' : 'help'} s={36} c={inv ? C.err : C.amber} w={2.5} />
+          </View>
+          {inv ? chip('Image rejected', 'err', 'warn') : chip('Needs another look', 'amber', 'warn')}
+          <Txt k="title" style={{ textAlign: 'center', fontSize: 28 }}>{inv ? "Can't grade this image" : 'Result is uncertain'}</Txt>
+          <Txt style={{ maxWidth: 480, textAlign: 'center', fontSize: 14.5, color: inv ? '#6E1E1E' : '#5F3B00' }}>{inv ? "It doesn't show a usable tuna sample. This is a rejected image, not a Grade C." : 'The model could not decide with enough certainty. Retake the image, override manually, or ask an expert.'}</Txt>
         </Card>
         {sampleInfoCard(c, s, [['Sample', TYPES[c.type].name], ['Record', s.recordId], [inv ? 'Model output' : 'Closest candidate', inv ? 'Rejected input' : `Grade ${c.label} · ${Math.round(c.score * 100)}%`]], null)}
         {!inv ? <DemoPill label="Override grade manually" a="override" icon="edit" /> : null}
@@ -3109,11 +3182,22 @@ screens.paired = () => {
 
 screens.price = () => {
   const s = S.session, p = priceFor(s);
+  const heroBg = p.ok ? (GRADE_HERO[p.grade] || C.primary) : C.navy;
   return (
     <Shell idx={6} left={[backBtn('go', screenAfterGrade(s)), helpBtn()]} right={[B('Confirm', 'confirmQuote', '', 'primary', !p.ok, 'check')]}>
-      <View style={[BODY, { gap: 10, paddingBottom: 8 }]}>
-        <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Estimated value</Txt>
-        {p.ok ? <View style={{ alignItems: 'center' }}>{gradeChip(p.grade)}</View> : null}
+      <View style={[BODY, { gap: 12, paddingBottom: 12 }]}>
+        <View style={{ backgroundColor: heroBg, borderRadius: 24, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: heroBg, shadowOpacity: 0.24, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 }}>
+          <View style={{ gap: 2 }}>
+            <Text style={{ fontSize: 11.5, fontWeight: '800', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.7 }}>ESTIMATED VALUE</Text>
+            <Text style={{ fontSize: 26 * TS(), fontWeight: '800', color: '#fff' }}>{p.ok ? `Grade ${p.grade}` : 'Price unavailable'}</Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.86)', fontWeight: '600' }}>{p.ok ? (GRADE_SUB[p.grade] || '') : 'Check schedule or weight'}</Text>
+          </View>
+          {p.ok ? (
+            <View style={{ width: 58, height: 58, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 30, fontWeight: '800', color: '#fff' }}>{p.grade}</Text>
+            </View>
+          ) : null}
+        </View>
         {valueCard(s, p)}
         <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a="override" icon="edit" />
       </View>
@@ -3429,11 +3513,16 @@ function histDetail(r) {
     <Shell idx={0} left={[backBtn('closeHist'), helpBtn()]}
       right={[q ? B('Print receipt', 'reprintRec', r.id, 'primary', false, 'print') : null]}>
       <View style={[BODY, { gap: 12, justifyContent: 'flex-start', paddingTop: 12 }]}>
-        <Card lift style={{ alignItems: 'center', gap: 2, paddingVertical: 20, backgroundColor: g ? GBG[g] : C.amberbg }}>
-          <Txt k="label">{g ? 'Final grade' : 'Not graded yet'}</Txt>
-          <Text style={{ fontSize: 72 * ts, fontWeight: '800', lineHeight: 78 * ts, color: g ? GC[g] : C.amber }}>{g || '—'}</Text>
-          {q ? <Txt k="h2" style={{ color: g ? GC[g] : C.navy }}>{fmtMoney(q.totalC)}</Txt> : null}
-        </Card>
+        <View style={{ backgroundColor: g ? (GRADE_HERO[g] || C.primary) : C.amberbg, borderRadius: 26, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, borderWidth: g ? 0 : 1.5, borderColor: '#EBD59C', shadowColor: g ? (GRADE_HERO[g] || C.primary) : C.navy, shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 }}>
+          <View style={{ width: 68, height: 68, borderRadius: 22, backgroundColor: g ? 'rgba(255,255,255,0.2)' : '#fff', borderWidth: 2, borderColor: g ? 'rgba(255,255,255,0.55)' : '#EBD59C', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 36 * ts, fontWeight: '800', color: g ? '#fff' : C.amber }}>{g || '—'}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 11.5, fontWeight: '800', color: g ? 'rgba(255,255,255,0.8)' : C.amber, letterSpacing: 0.6 }}>{g ? 'FINAL GRADE' : 'NOT GRADED YET'}</Text>
+            <Text style={{ fontSize: 28 * ts, fontWeight: '800', color: g ? '#fff' : C.navy }}>{q ? fmtMoney(q.totalC) : (g ? `Grade ${g}` : 'Pending')}</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: g ? 'rgba(255,255,255,0.88)' : C.text2 }}>{`${fmtKg(r.weightTenths)} · ${syncLabel(r)}`}</Text>
+          </View>
+        </View>
         {caps.map((c) => (
           <Card key={c.id} style={{ gap: 12 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
