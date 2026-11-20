@@ -2990,6 +2990,7 @@ screens.result = () => {
             <Txt k="title" style={{ fontSize: 28 }}>{tailPrompt ? 'Tail cut needed' : 'Final grade'}</Txt>
             <Txt k="det">{`${s.recordId} · ${s.grader} · ${fmtKg(s.weightTenths)}`}</Txt>
           </View>
+          {tailPrompt ? chip('Action needed', 'amber', 'warn') : r.provisional ? chip('Provisional', 'amber', 'warn') : chip('Graded', 'ok', 'check')}
           {!tailPrompt && r.provisional ? chip('Provisional', 'amber', 'warn') : null}
         </View>
 
@@ -3016,6 +3017,15 @@ screens.result = () => {
                   <Text style={{ color: heroBg, fontSize: 13, fontWeight: '800' }}>{`${pct}%`}</Text>
                 </View>
               </View>
+              <View style={{ width: '88%', marginTop: 8, gap: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '700' }}>{`${TYPES[c.type].short} · Grade ${c.label}`}</Text>
+                  <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '800' }}>{`${pct}%`}</Text>
+                </View>
+                <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.min(100, pct)}%`, height: '100%', backgroundColor: '#fff', borderRadius: 4 }} />
+                </View>
+              </View>
             </>
           )}
         </Card>
@@ -3039,6 +3049,7 @@ screens.result = () => {
                 </View>
               </View>
             </Card>
+            {valueCard(s, p)}
             {p.ok ? valueCard(s, p) : null}
           </>
         )}
@@ -3955,23 +3966,23 @@ function Drawer() {
             </View>
             {b('Close', 0, 'close')}
           </View>
-        {p('Enable Demo mode to simulate Pi inference & camera, or jump to any screen.')}
-        {h3('Demo mode')}{grp([b('Demo ON', D.enabled, 'mode:on'), b('Demo OFF (Live Pi)', !D.enabled, 'mode:off')])}
-        {h3('Jump to screen')}{grp([
-          ['welcome', 'Welcome'], ['grader', 'Grader'], ['weight', 'Weight'], ['tutorial', 'Tutorial'],
-          ['pair', 'Connect'], ['camera', 'Camera'], ['result', 'Result'], ['paired', 'Final Combined'],
-          ['override', 'Override'], ['receipt', 'Receipt'], ['completion', 'Completion'], ['history', 'Dashboard'],
-        ].map(([scr, label]) => b(label, S.screen === scr, 'jump:' + scr)))}
-        {h3('Connectivity')}{grp([b('Online', S.net === 'online', 'net:online'), b('Offline', S.net === 'offline', 'net:offline'), b('Wi-Fi, no cloud', S.net === 'wifi', 'net:wifi')])}
-        {h3('Next capture result')}{grp([['A', 'Grade A'], ['B', 'Grade B'], ['C', 'Grade C'], ['UNC', 'Uncertain'], ['INV', 'Invalid']].map((x) => b(x[1], D.next === x[0] && q0, 'next:' + x[0])))}
-        {h3('Scenario presets')}{grp([b('Paired agree (A, A)', 0, 'q:A,A'), b('Paired conflict (A, B)', 0, 'q:A,B'), b('Uncertain, then A', 0, 'q:UNC,A'), b('Invalid, then B', 0, 'q:INV,B')])}
-        {p('Queued results: ' + (D.queue.length ? D.queue.join(', ') : 'none'))}
-        {h3('Camera quality')}{grp([b('Sharp', D.quality === 'ok', 'qual:ok'), b('Out of focus', D.quality === 'blurry', 'qual:blurry')])}
-        {h3('Faults (fire once)')}{grp([b('Printer fails', D.printer === 'fail', 'pr:fail'), b('Paper out', D.printer === 'paper', 'pr:paper'), b('Analysis timeout', D.timeoutOnce, 'timeout'), b('Cloud upload fails', D.cloudFailNext > 0, 'cloudfail')])}
-        {h3('Pricing')}{grp([b('Schedule valid', !S.schedule.expired, 'sch:ok'), b('Schedule expired', S.schedule.expired, 'sch:exp')])}
-        {h3('Startup')}{grp([b('Normal', D.startupFault === 'none', 'su:none'), b('Phone link fault', D.startupFault === 'camera', 'su:camera'), b('Model missing', D.startupFault === 'model', 'su:model'), b('Re-run startup', 0, 'rerun')])}
-        {h3('Staff PINs (demo)')}{p("Administrator 1234 · Expert grader 2468. Admin can't decide grades.")}
-        {h3('Data')}{grp([b('Replay onboarding', 0, 'onb'), b('Show tips again', 0, 'tips'), b('Reset all demo data', 0, 'reset')])}
+          {p('Enable Demo mode to simulate Pi inference & camera, or jump to any screen.')}
+          {h3('Demo mode')}{grp([b('Demo ON', D.enabled, 'mode:on'), b('Demo OFF (Live Pi)', !D.enabled, 'mode:off')])}
+          {h3('Jump to screen')}{grp([
+            ['welcome', 'Welcome'], ['grader', 'Grader'], ['weight', 'Weight'], ['tutorial', 'Tutorial'],
+            ['pair', 'Connect'], ['camera', 'Camera'], ['result', 'Result'], ['paired', 'Final Combined'],
+            ['override', 'Override'], ['receipt', 'Receipt'], ['completion', 'Completion'], ['history', 'Dashboard'],
+          ].map(([scr, label]) => b(label, S.screen === scr, 'jump:' + scr)))}
+          {h3('Connectivity')}{grp([b('Online', S.net === 'online', 'net:online'), b('Offline', S.net === 'offline', 'net:offline'), b('Wi-Fi, no cloud', S.net === 'wifi', 'net:wifi')])}
+          {h3('Next capture result')}{grp([['A', 'Grade A'], ['B', 'Grade B'], ['C', 'Grade C'], ['UNC', 'Uncertain'], ['INV', 'Invalid']].map((x) => b(x[1], D.next === x[0] && q0, 'next:' + x[0])))}
+          {h3('Scenario presets')}{grp([b('Paired agree (A, A)', 0, 'q:A,A'), b('Paired conflict (A, B)', 0, 'q:A,B'), b('Uncertain, then A', 0, 'q:UNC,A'), b('Invalid, then B', 0, 'q:INV,B')])}
+          {p('Queued results: ' + (D.queue.length ? D.queue.join(', ') : 'none'))}
+          {h3('Camera quality')}{grp([b('Sharp', D.quality === 'ok', 'qual:ok'), b('Out of focus', D.quality === 'blurry', 'qual:blurry')])}
+          {h3('Faults (fire once)')}{grp([b('Printer fails', D.printer === 'fail', 'pr:fail'), b('Paper out', D.printer === 'paper', 'pr:paper'), b('Analysis timeout', D.timeoutOnce, 'timeout'), b('Cloud upload fails', D.cloudFailNext > 0, 'cloudfail')])}
+          {h3('Pricing')}{grp([b('Schedule valid', !S.schedule.expired, 'sch:ok'), b('Schedule expired', S.schedule.expired, 'sch:exp')])}
+          {h3('Startup')}{grp([b('Normal', D.startupFault === 'none', 'su:none'), b('Phone link fault', D.startupFault === 'camera', 'su:camera'), b('Model missing', D.startupFault === 'model', 'su:model'), b('Re-run startup', 0, 'rerun')])}
+          {h3('Staff PINs (demo)')}{p("Administrator 1234 · Expert grader 2468. Admin can't decide grades.")}
+          {h3('Data')}{grp([b('Replay onboarding', 0, 'onb'), b('Show tips again', 0, 'tips'), b('Reset all demo data', 0, 'reset')])}
         </ScrollView>
       </View>
     </View>
