@@ -1551,6 +1551,49 @@ function Card({ lift, style, children }) {
     lift && { shadowColor: C.navy, shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 4 }, style]}>{children}</View>
   );
 }
+const MODAL_TONES = {
+  primary: { bg: '#EEF4FF', fg: C.primary, border: '#C9D9F7', icon: 'help' },
+  danger: { bg: C.errbg, fg: C.err, border: '#F2C6C6', icon: 'warn' },
+  amber: { bg: C.amberbg, fg: C.amber, border: '#EBD59C', icon: 'warn' },
+  ok: { bg: C.gAbg, fg: C.gA, border: '#BCE4D0', icon: 'check' },
+};
+function ModalFrame({ tone = 'primary', icon, badge, title, subtitle, maxWidth = 420, zIndex = 60, center, children }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    anim.setValue(0);
+    Animated.spring(anim, { toValue: 1, friction: 8, tension: 85, useNativeDriver: true }).start();
+  }, [anim]);
+  const t = MODAL_TONES[tone] || MODAL_TONES.primary;
+  const ic = icon || t.icon;
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(11,24,46,0.58)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex }]}>
+      <Animated.View style={{
+        width: '100%', maxWidth, backgroundColor: '#FFFFFF', borderRadius: 28, borderWidth: 1, borderColor: '#DCE5F2',
+        padding: 22, gap: 14, alignItems: center ? 'center' : 'stretch',
+        shadowColor: '#0A1930', shadowOpacity: 0.28, shadowRadius: 28, shadowOffset: { width: 0, height: 14 }, elevation: 14,
+        opacity: anim, transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.93, 1] }) }],
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: center ? 'center' : 'space-between', gap: 10 }}>
+          <View style={{ width: 46, height: 46, borderRadius: 16, backgroundColor: t.bg, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon n={ic} s={24} c={t.fg} w={2.4} />
+          </View>
+          {badge ? (
+            <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: t.bg, borderWidth: 1, borderColor: t.border }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: t.fg, letterSpacing: 0.6 }}>{badge}</Text>
+            </View>
+          ) : null}
+        </View>
+        {title || subtitle ? (
+          <View style={{ gap: 6, alignItems: center ? 'center' : 'flex-start' }}>
+            {title ? <Text style={{ fontSize: 22 * TS(), fontWeight: '800', color: C.navy, textAlign: center ? 'center' : 'left', letterSpacing: -0.3 }}>{title}</Text> : null}
+            {subtitle ? <Text style={{ fontSize: 14.5 * TS(), lineHeight: 21 * TS(), color: C.text2, textAlign: center ? 'center' : 'left' }}>{subtitle}</Text> : null}
+          </View>
+        ) : null}
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
 function KV({ l, r, last, center }) {
   const ts = TS();
   return (
@@ -1599,7 +1642,7 @@ function Btn({ label, act: a, arg, kind = '', dis = false, icon, style, bar }) {
         style,
       ]}
     >
-      {label ? <Text style={{ fontSize: fs, fontWeight: '700', color: fg, textAlign: 'center', flexShrink: 1 }}>{label}</Text> : null}
+      {label ? <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={{ fontSize: fs, fontWeight: '700', color: fg, textAlign: 'center', flexShrink: 1 }}>{label}</Text> : null}
       {icon ? <Icon n={icon} s={primary ? 20 : 18} c={fg} /> : null}
     </Pressable>
   );
@@ -1915,52 +1958,51 @@ function renderWelcome() {
       </View>
 
       {sm && sm.open ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.48)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 60 }}>
-          <Card lift style={{ width: '100%', maxWidth: 420, gap: 12, padding: 20, borderRadius: 24 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Txt k="h1" style={{ fontSize: 20 }}>Sync pending records</Txt>
-              {B('Toggle all', 'syncToggleAll', '', 'small ghost')}
-            </View>
-            <Txt k="sub">Select graders to upload to shared Supabase:</Txt>
-            <ScrollView style={{ maxHeight: 220 }}>
-              <View style={{ gap: 8 }}>
-                {Object.keys(sm.groups).length ? Object.keys(sm.groups).map((g) => {
-                  const info = sm.groups[g], on = !!sm.selected[g];
-                  return (
-                    <Pressable key={g} onPress={() => act('syncToggleGrader', g)}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: on ? C.primary : C.border, backgroundColor: on ? '#EEF4FF' : C.surface }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: on ? C.primary : C.border, backgroundColor: on ? C.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                          {on ? <Icon n="check" s={14} c="#fff" w={3} /> : null}
-                        </View>
-                        <Text style={{ fontWeight: '700', color: C.navy, fontSize: 15 }}>{g}</Text>
+        <ModalFrame tone="primary" icon="refresh" badge="CLOUD SYNC" title="Sync pending records" subtitle="Select graders to upload to shared Supabase." maxWidth={440} zIndex={60}>
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: -6 }}>
+            {B('Toggle all', 'syncToggleAll', '', 'small ghost')}
+          </View>
+          <ScrollView style={{ maxHeight: 220 }}>
+            <View style={{ gap: 8 }}>
+              {Object.keys(sm.groups).length ? Object.keys(sm.groups).map((g) => {
+                const info = sm.groups[g], on = !!sm.selected[g];
+                return (
+                  <Pressable key={g} onPress={() => act('syncToggleGrader', g)}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 16, borderWidth: 1.5, borderColor: on ? C.primary : C.border, backgroundColor: on ? '#EEF4FF' : C.surface }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 2, borderColor: on ? C.primary : C.border, backgroundColor: on ? C.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                        {on ? <Icon n="check" s={14} c="#fff" w={3} /> : null}
                       </View>
-                      <Text style={{ color: C.text2, fontSize: 13 }}>{`${info.pending} pending · ${info.total} total`}</Text>
-                    </Pressable>
-                  );
-                }) : <Txt k="det">No local records on this device yet.</Txt>}
-              </View>
-            </ScrollView>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {B('Close', 'syncModalClose', '', '', false, '', { flex: 1 })}
-              {B('Sync selected', 'syncStartSelected', '', 'primary', !Object.values(sm.selected).some(Boolean), 'refresh', { flex: 1 })}
+                      <Text style={{ fontWeight: '800', color: C.navy, fontSize: 15 }}>{g}</Text>
+                    </View>
+                    <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: on ? '#DCE8FF' : C.canvas }}>
+                      <Text style={{ color: on ? C.primary : C.text2, fontSize: 12, fontWeight: '700' }}>{`${info.pending} pending · ${info.total}`}</Text>
+                    </View>
+                  </Pressable>
+                );
+              }) : <Txt k="det">No local records on this device yet.</Txt>}
             </View>
-          </Card>
-        </View>
+          </ScrollView>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {B('Close', 'syncModalClose', '', '', false, '', { flex: 1 })}
+            {B('Sync selected', 'syncStartSelected', '', 'primary', !Object.values(sm.selected).some(Boolean), 'refresh', { flex: 1.3 })}
+          </View>
+        </ModalFrame>
       ) : null}
 
       {sw && sw.open ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.48)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 70 }}>
-          <Card lift style={{ width: '100%', maxWidth: 400, gap: 14, padding: 22, borderRadius: 24, alignItems: 'center' }}>
-            <Spin />
-            <Txt k="h1" style={{ fontSize: 20, textAlign: 'center' }}>Slow Wi-Fi connection</Txt>
-            <Txt k="sub" style={{ textAlign: 'center' }}>{`Syncing ${Math.min(sw.done + 1, sw.total)}/${sw.total}…`}</Txt>
-            <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
-              {B('Sync in background', 'slowWifiBg', '', '', false, '', { flex: 1 })}
-              {B('Keep waiting', 'slowWifiBg', '', 'primary', false, '', { flex: 1 })}
-            </View>
-          </Card>
-        </View>
+        <ModalFrame tone="amber" icon="refresh" badge="SLOW CONNECTION" title="Syncing in progress" subtitle={`Uploading record ${Math.min(sw.done + 1, sw.total)} of ${sw.total}…`} maxWidth={400} zIndex={70} center>
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#EEF4FF', alignItems: 'center', justifyContent: 'center' }}>
+            <Spin size={46} bw={4} />
+          </View>
+          <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: C.canvas, overflow: 'hidden' }}>
+            <View style={{ width: `${Math.min(100, Math.round(((sw.done + 1) / Math.max(1, sw.total)) * 100))}%`, height: '100%', backgroundColor: C.primary, borderRadius: 4 }} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+            {B('Background', 'slowWifiBg', '', '', false, '', { flex: 1 })}
+            {B('Keep waiting', 'slowWifiBg', '', 'primary', false, '', { flex: 1 })}
+          </View>
+        </ModalFrame>
       ) : null}
     </Hero>
   );
@@ -2056,60 +2098,65 @@ screens.grader = () => {
             placeholder="Enter your name" placeholderTextColor="#8A99AB"
             autoCapitalize="words" autoCorrect={false} maxLength={15} returnKeyType="done"
           />
-          <View style={{ backgroundColor: C.canvas, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>Today at this station</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <View><Text style={{ fontSize: 20, fontWeight: '800', color: C.navy }}>{todayList.length}</Text><Text style={{ fontSize: 12, color: C.text2 }}>Sessions</Text></View>
-              <View><Text style={{ fontSize: 20, fontWeight: '800', color: C.navy }}>{kgToday}</Text><Text style={{ fontSize: 12, color: C.text2 }}>kg graded</Text></View>
-              <View><Text style={{ fontSize: 20, fontWeight: '800', color: C.navy }}>{`${aPct}%`}</Text><Text style={{ fontSize: 12, color: C.text2 }}>Grade A</Text></View>
+          <View style={{ backgroundColor: C.canvas, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: C.text2, letterSpacing: 0.4 }}>TODAY AT THIS STATION</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' }}>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: C.navy }}>{todayList.length}</Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '600', color: C.text2 }}>Sessions</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' }}>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: C.navy }}>{kgToday}</Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '600', color: C.text2 }}>kg graded</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' }}>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: C.primary }}>{`${aPct}%`}</Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '600', color: C.text2 }}>Grade A</Text>
+              </View>
             </View>
           </View>
         </Card>
       </View>
 
       {gm ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.48)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 60 }}>
-          <Card lift style={{ width: '100%', maxWidth: 430, gap: 14, padding: 20, borderRadius: 24 }}>
-            <Txt k="h1" style={{ fontSize: 22 }}>{`Are you ${gm.match.name}?`}</Txt>
-            <Txt k="sub">{`Have you graded ${gm.match.ago}?`}</Txt>
-            {!gm.addingInitial ? (
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                {B('No, start new', 'graderMatchNo', '', '', false, '', { flex: 1 })}
-                {B('Yes, continue', 'graderMatchYes', '', 'primary', false, 'check', { flex: 1 })}
-              </View>
-            ) : (
-              <View style={{ gap: 10 }}>
-                <Txt k="label">{`Add 1–4 last-initial characters for "${gm.typed} ${gm.initialStr || '_'}"`}</Txt>
-                <TextInput
-                  value={gm.initialStr}
-                  onChangeText={(v) => act('graderInitialSet', v)}
-                  placeholder="Type 1–4 characters (e.g. H)"
-                  placeholderTextColor="#8A99AB"
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  autoFocus
-                  maxLength={4}
-                  style={[st.field, { minHeight: 48, borderRadius: 14, fontSize: 18 * ts, fontWeight: '700', paddingHorizontal: 14, borderColor: C.primary, backgroundColor: '#fff' }]}
-                />
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {initials.map((ch) => (
-                    <Pressable key={ch} onPress={() => act('graderInitialKey', ch)} style={{ width: 34, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.canvas, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontWeight: '700', color: C.navy }}>{ch}</Text>
-                    </Pressable>
-                  ))}
-                  <Pressable onPress={() => act('graderInitialKey', 'del')} style={{ width: 46, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.warnbg, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontWeight: '700', color: C.navy }}>⌫</Text>
+        <ModalFrame tone="primary" icon="check" badge="GRADER IDENTITY" title={`Are you ${gm.match.name}?`} subtitle={`Last graded ${gm.match.ago}`} maxWidth={430} zIndex={60}>
+          {!gm.addingInitial ? (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {B('No, start new', 'graderMatchNo', '', '', false, '', { flex: 1 })}
+              {B('Yes, continue', 'graderMatchYes', '', 'primary', false, 'check', { flex: 1 })}
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              <Txt k="label">{`Add 1–4 last-initial characters for "${gm.typed} ${gm.initialStr || '_'}"`}</Txt>
+              <TextInput
+                value={gm.initialStr}
+                onChangeText={(v) => act('graderInitialSet', v)}
+                placeholder="Type 1–4 characters (e.g. H)"
+                placeholderTextColor="#8A99AB"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                autoFocus
+                maxLength={4}
+                style={[st.field, { minHeight: 50, borderRadius: 16, fontSize: 18 * ts, fontWeight: '700', paddingHorizontal: 14, borderColor: C.primary, backgroundColor: '#fff' }]}
+              />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {initials.map((ch) => (
+                  <Pressable key={ch} onPress={() => act('graderInitialKey', ch)} style={{ width: 34, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.canvas, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontWeight: '700', color: C.navy }}>{ch}</Text>
                   </Pressable>
-                </View>
-                {gm.error ? <Text style={{ color: C.err, fontSize: 13 }}>{gm.error}</Text> : null}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  {B('Cancel', 'graderCheckCancel', '', '', false, '', { flex: 1 })}
-                  {B('Continue', 'graderInitialConfirm', '', 'primary', !gm.initialStr.length, 'arrow', { flex: 1 })}
-                </View>
+                ))}
+                <Pressable onPress={() => act('graderInitialKey', 'del')} style={{ width: 46, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.warnbg, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontWeight: '700', color: C.navy }}>⌫</Text>
+                </Pressable>
               </View>
-            )}
-          </Card>
-        </View>
+              {gm.error ? <Text style={{ color: C.err, fontSize: 13 }}>{gm.error}</Text> : null}
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {B('Cancel', 'graderCheckCancel', '', '', false, '', { flex: 1 })}
+                {B('Continue', 'graderInitialConfirm', '', 'primary', !gm.initialStr.length, 'arrow', { flex: 1 })}
+              </View>
+            </View>
+          )}
+        </ModalFrame>
       ) : null}
     </Shell>
   );
@@ -2754,14 +2801,9 @@ screens.camera = () => {
         {S.demo.quality === 'blurry' ? chip('Check focus', 'amber', 'warn', { alignSelf: 'center' }) : null}
       </View>
       {S.cannotDetermineModal && S.cannotDetermineModal.open ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 60 }}>
-          <Card lift style={{ width: '100%', maxWidth: 410, gap: 14, padding: 22, borderRadius: 24, alignItems: 'center' }}>
-            {chip('Cannot Be Determined', 'err', 'warn')}
-            <Txt k="h1" style={{ fontSize: 20, textAlign: 'center' }}>Cannot Be Determined</Txt>
-            <Txt k="sub" style={{ textAlign: 'center' }}>{S.cannotDetermineModal.message}</Txt>
-            {B('Scan again', 'dismissCannotDetermine', '', 'primary', false, 'camera', { width: '100%' })}
-          </Card>
-        </View>
+        <ModalFrame tone="danger" icon="warn" badge="CANNOT BE DETERMINED" title="Cannot Be Determined" subtitle={S.cannotDetermineModal.message} maxWidth={410} zIndex={60} center>
+          {B('Scan again', 'dismissCannotDetermine', '', 'primary', false, 'camera', { width: '100%' })}
+        </ModalFrame>
       ) : null}
     </Shell>
   );
@@ -2943,28 +2985,24 @@ screens.result = () => {
       </View>
 
       {tailPrompt && s.tailPromptOpen ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.45)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 50 }}>
-          <Card lift style={{ width: '100%', maxWidth: 440, gap: 14, padding: 20, borderRadius: 26 }}>
-            <View style={{ alignSelf: 'flex-start' }}>{chip(`Sashibo Core · Grade ${g} · ${pct}%`, 'amber')}</View>
-            <Txt k="h1" style={{ fontSize: 22 }}>Is a Tail-Cut sample available?</Txt>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1, borderWidth: 1, borderColor: '#EBD59C', backgroundColor: '#FFF9EC', borderRadius: 16, padding: 10, alignItems: 'center', gap: 4 }}>
-                <SampleIcon type="core" size={56} />
-                <Text style={{ fontWeight: '800', color: C.navy, fontSize: 13 }}>{`Grade ${g} (${pct}%)`}</Text>
-                <Text style={{ color: C.text2, fontSize: 11 }}>{pct < 75 ? 'Under 75%' : 'Grade C'}</Text>
-              </View>
-              <View style={{ flex: 1, borderWidth: 1, borderColor: C.border, backgroundColor: C.canvas, borderRadius: 16, padding: 10, alignItems: 'center', gap: 4 }}>
-                <SampleIcon type="tail" size={56} />
-                <Text style={{ fontWeight: '800', color: C.navy, fontSize: 13 }}>2nd Check</Text>
-                <Text style={{ color: C.text2, fontSize: 11 }}>Combines both</Text>
-              </View>
+        <ModalFrame tone="amber" icon="warn" badge={`CORE · GRADE ${g} · ${pct}%`} title="Is a Tail-Cut sample available?" subtitle="Scanning a tail-cut combines both samples for a stronger final grade." maxWidth={440} zIndex={50}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1, borderWidth: 1.5, borderColor: '#EBD59C', backgroundColor: '#FFF9EC', borderRadius: 18, padding: 12, alignItems: 'center', gap: 4 }}>
+              <SampleIcon type="core" size={56} />
+              <Text style={{ fontWeight: '800', color: C.navy, fontSize: 13 }}>{`Grade ${g} (${pct}%)`}</Text>
+              <Text style={{ color: C.amber, fontSize: 11, fontWeight: '700' }}>{pct < 75 ? 'Under 75%' : 'Grade C'}</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { flex: 1 })}
-              {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { flex: 1 })}
+            <View style={{ flex: 1, borderWidth: 1.5, borderColor: '#C9D9F7', backgroundColor: '#F4F8FF', borderRadius: 18, padding: 12, alignItems: 'center', gap: 4 }}>
+              <SampleIcon type="tail" size={56} />
+              <Text style={{ fontWeight: '800', color: C.navy, fontSize: 13 }}>2nd Check</Text>
+              <Text style={{ color: C.primary, fontSize: 11, fontWeight: '700' }}>Combines both</Text>
             </View>
-          </Card>
-        </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { flex: 1 })}
+            {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { flex: 1.2 })}
+          </View>
+        </ModalFrame>
       ) : null}
     </Shell>
   );
@@ -3305,16 +3343,12 @@ screens.receipt = () => {
         </View>
       </View>
       {S.skipReceiptModal ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.48)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 60 }}>
-          <Card lift style={{ width: '100%', maxWidth: 400, gap: 14, padding: 22, borderRadius: 24 }}>
-            <Txt k="h1" style={{ fontSize: 22 }}>Skip printing?</Txt>
-            <Txt k="sub">The record remains saved locally.</Txt>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {B('Cancel', 'cancelSkipReceipt', '', '', false, '', { flex: 1 })}
-              {B('Skip & finish', 'confirmSkipReceipt', '', 'primary', false, 'arrow', { flex: 1 })}
-            </View>
-          </Card>
-        </View>
+        <ModalFrame tone="amber" icon="print" badge="SKIP RECEIPT" title="Skip printing?" subtitle="Your grading record is already saved locally on this device." maxWidth={400} zIndex={60}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {B('Cancel', 'cancelSkipReceipt', '', '', false, '', { flex: 1 })}
+            {B('Skip & finish', 'confirmSkipReceipt', '', 'primary', false, 'arrow', { flex: 1.2 })}
+          </View>
+        </ModalFrame>
       ) : null}
     </Shell>
   );
@@ -3727,56 +3761,46 @@ function overlay() {
     const L = S.login;
     const rows = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['', '0', 'del']];
     return (
-      <Overlay>
-        <View style={[dialogBox, { alignItems: 'center', gap: 8 }]}>
-          <Icon n="lock" s={44} c={C.primary} />
-          <Txt k="h2">{L.intent === 'expert' ? 'Expert sign-in' : 'Staff sign-in'}</Txt>
-          <Txt k="sub">{L.error ? <Text style={{ color: C.err }}>{L.error}</Text> : 'Enter your 4-digit PIN.'}</Txt>
-          <View style={{ flexDirection: 'row', gap: 14, justifyContent: 'center', marginTop: 12, marginBottom: 18 }}>
-            {[0, 1, 2, 3].map((i) => <View key={i} style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 3, borderColor: C.primary, backgroundColor: i < L.pin.length ? C.primary : 'transparent' }} />)}
-          </View>
-          <View style={{ gap: 10, width: '100%' }}>
-            {rows.map((r, i) => (
-              <View key={i} style={{ flexDirection: 'row', gap: 10 }}>
-                {r.map((k, j) => k === '' ? <View key={`spacer-${j}`} style={{ flex: 1 }} /> : (
-                  <Pressable key={k} onPress={() => act('pinKey', k)} style={({ pressed }) => [st.key, pressed && { backgroundColor: '#E4ECFC', transform: [{ scale: 0.97 }] }]}>
-                    {k === 'del' ? <Icon n="backspace" s={32} /> : <Text style={st.keyText}>{k}</Text>}
-                  </Pressable>
-                ))}
-              </View>
-            ))}
-          </View>
-          <View style={{ flexDirection: 'row', gap: 16, marginTop: 24, width: '100%' }}>
-            {B('Cancel', 'loginCancel', '', '', '', '', { flex: 1 })}{B('Log in', 'loginGo', '', 'primary', L.pin.length !== 4, '', { flex: 1 })}
-          </View>
+      <ModalFrame tone="primary" icon="lock" badge={L.intent === 'expert' ? 'EXPERT ACCESS' : 'STAFF ACCESS'} title={L.intent === 'expert' ? 'Expert sign-in' : 'Staff sign-in'} subtitle={L.error || 'Enter your 4-digit PIN.'} maxWidth={440} zIndex={40} center>
+        <View style={{ flexDirection: 'row', gap: 14, justifyContent: 'center', marginVertical: 4 }}>
+          {[0, 1, 2, 3].map((i) => <View key={i} style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2.5, borderColor: L.error ? C.err : C.primary, backgroundColor: i < L.pin.length ? (L.error ? C.err : C.primary) : 'transparent' }} />)}
         </View>
-      </Overlay>
+        <View style={{ gap: 8, width: '100%' }}>
+          {rows.map((r, i) => (
+            <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+              {r.map((k, j) => k === '' ? <View key={`spacer-${j}`} style={{ flex: 1 }} /> : (
+                <Pressable key={k} onPress={() => act('pinKey', k)} style={({ pressed }) => [st.key, { minHeight: 54, borderRadius: 16 }, pressed && { backgroundColor: '#E4ECFC', transform: [{ scale: 0.97 }] }]}>
+                  {k === 'del' ? <Icon n="backspace" s={28} /> : <Text style={st.keyText}>{k}</Text>}
+                </Pressable>
+              ))}
+            </View>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' }}>
+          {B('Cancel', 'loginCancel', '', '', '', '', { flex: 1 })}
+          {B('Log in', 'loginGo', '', 'primary', L.pin.length !== 4, 'check', { flex: 1 })}
+        </View>
+      </ModalFrame>
     );
   }
   if (S.dialog) {
     const d = S.dialog;
+    const hasDanger = d.acts.some((a) => (a.kind || '').includes('danger'));
+    const tone = hasDanger ? 'danger' : 'primary';
+    const badge = hasDanger ? 'CONFIRM ACTION' : 'NOTICE';
     return (
-      <Overlay>
-        <View style={dialogBox}>
-          <Txt k="h2">{d.title}</Txt>
-          <Txt style={{ marginTop: 12, color: C.text2 }}>{d.body}</Txt>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
-            {d.acts.map((a, i) => <React.Fragment key={i}>{B(a.label, a.act, a.arg, a.kind || '', false, '', { flexBasis: '40%', flexGrow: 1 })}</React.Fragment>)}
-          </View>
+      <ModalFrame tone={tone} icon={hasDanger ? 'warn' : 'help'} badge={badge} title={d.title} subtitle={d.body} maxWidth={420} zIndex={50}>
+        <View style={{ flexDirection: d.acts.length > 2 ? 'column' : 'row', gap: 10, marginTop: 4 }}>
+          {d.acts.map((a, i) => <React.Fragment key={i}>{B(a.label, a.act, a.arg, a.kind || '', false, '', d.acts.length > 2 ? { width: '100%' } : { flex: 1 })}</React.Fragment>)}
         </View>
-      </Overlay>
+      </ModalFrame>
     );
   }
   if (S.help) {
     return (
-      <Overlay>
-        <View style={dialogBox}>
-          <Icon n="help" s={40} c={C.primary} />
-          <Txt k="h2" style={{ marginTop: 8 }}>Help</Txt>
-          <Txt style={{ marginTop: 12 }}>{HELP[S.screen] || HELP.default}</Txt>
-          <View style={{ marginTop: 20 }}>{B('Got it', 'closeHelp', '', 'primary')}</View>
-        </View>
-      </Overlay>
+      <ModalFrame tone="primary" icon="help" badge="QUICK GUIDE" title="Help" subtitle={HELP[S.screen] || HELP.default} maxWidth={420} zIndex={50}>
+        {B('Got it', 'closeHelp', '', 'primary', false, 'check', { width: '100%' })}
+      </ModalFrame>
     );
   }
   return null;
@@ -3856,9 +3880,19 @@ function Drawer() {
   const grp = (items) => <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{items}</View>;
   const p = (t) => <Text style={st.dp}>{t}</Text>;
   return (
-    <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '88%', maxWidth: 340, backgroundColor: C.chromeBg, borderLeftWidth: 1, borderLeftColor: C.chromeBorder, zIndex: 20 }}>
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ fontWeight: '700', fontSize: 14, color: C.chromeText }}>Demo controls</Text>{b('Close', 0, 'close')}</View>
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(11,24,46,0.45)', flexDirection: 'row', justifyContent: 'flex-end', zIndex: 80 }]}>
+      <Pressable style={{ flex: 1 }} onPress={() => demoAct('close')} />
+      <View style={{ width: '88%', maxWidth: 350, height: '100%', backgroundColor: C.surface, borderTopLeftRadius: 28, borderBottomLeftRadius: 28, borderLeftWidth: 1, borderLeftColor: '#DCE5F2', shadowColor: '#0A1930', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: -8, height: 0 }, elevation: 16 }}>
+        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 32 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#EEF4FF', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon n="settings" s={17} c={C.primary} />
+              </View>
+              <Text style={{ fontWeight: '800', fontSize: 17, color: C.navy }}>Demo & Tools</Text>
+            </View>
+            {b('Close', 0, 'close')}
+          </View>
         {p('Enable Demo mode to simulate Pi inference & camera, or jump to any screen.')}
         {h3('Demo mode')}{grp([b('Demo ON', D.enabled, 'mode:on'), b('Demo OFF (Live Pi)', !D.enabled, 'mode:off')])}
         {h3('Jump to screen')}{grp([
@@ -3876,7 +3910,8 @@ function Drawer() {
         {h3('Startup')}{grp([b('Normal', D.startupFault === 'none', 'su:none'), b('Phone link fault', D.startupFault === 'camera', 'su:camera'), b('Model missing', D.startupFault === 'model', 'su:model'), b('Re-run startup', 0, 'rerun')])}
         {h3('Staff PINs (demo)')}{p("Administrator 1234 · Expert grader 2468. Admin can't decide grades.")}
         {h3('Data')}{grp([b('Replay onboarding', 0, 'onb'), b('Show tips again', 0, 'tips'), b('Reset all demo data', 0, 'reset')])}
-      </ScrollView>
+        </ScrollView>
+      </View>
     </View>
   );
 }
