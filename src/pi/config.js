@@ -1,10 +1,13 @@
+export const normalizePiUrl = (url) => String(url || '').trim().replace(/\/+$/, '');
+
+const ENV_PI_URL = normalizePiUrl(process.env.EXPO_PUBLIC_PI_API_URL);
+
 export const PI_CONFIG = {
-  host: '10.42.0.1',
-  apiPort: 5000,
-  streamPort: 8080,
-  // Verify which of these actually exist on your Pi, then change here only.
-  paths: { status: '/status', grade: '/grade' },
+  apiUrl: ENV_PI_URL || 'http://127.0.0.1:3000',
+  paths: { status: '/status', grade: '/grade', snapshot: '/snapshot', stream: '/stream' },
   healthTimeout: 5000,
+  snapshotTimeout: 6000,
   inferenceTimeout: 30000,
 };
-export const piUrl = (p) => `http://${PI_CONFIG.host}:${PI_CONFIG.apiPort}${p}`;
+
+export const piUrl = (p, baseUrl = PI_CONFIG.apiUrl) => `${normalizePiUrl(baseUrl) || PI_CONFIG.apiUrl}${p}`;

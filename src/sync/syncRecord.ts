@@ -29,6 +29,12 @@ export interface SyncResult {
   imagePaths: Partial<Record<LocalSampleKey, string>>
 }
 
+export const NUMERIC_VERIFY_TOLERANCE = 1e-3
+
+export function nearlyEqual(a: number, b: number, tolerance = NUMERIC_VERIFY_TOLERANCE): boolean {
+  return Math.abs(a - b) <= tolerance
+}
+
 /**
  * Local record -> auth -> upload images (upsert) -> upsert grading_records on `id`
  * -> read back -> resolve. Throws on any failure; the caller marks the record `failed`
