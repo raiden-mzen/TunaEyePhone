@@ -18,7 +18,7 @@ export const derivePiCameraUrls = (apiUrl, streamUrl = null, snapshotUrl = null)
 const ENV_PI_URL = normalizePiUrl(process.env.EXPO_PUBLIC_PI_API_URL);
 
 export const PI_CONFIG = {
-  apiUrl: ENV_PI_URL || 'http://127.0.0.1:3000',
+  apiUrl: ENV_PI_URL || 'http://10.42.0.1:5000',
   paths: { status: '/status', grade: '/grade', snapshot: '/snapshot', stream: '/stream' },
   healthTimeout: 5000,
   snapshotTimeout: 6000,

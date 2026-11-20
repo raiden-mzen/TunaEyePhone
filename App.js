@@ -2247,14 +2247,6 @@ screens.pair = () => {
             {S.scanError ? chip(S.scanError, 'err', 'warn', { alignSelf: 'center' }) : null}
             <Card style={{ width: '100%', gap: 10 }}>
               <Txt k="label">Direct Raspberry Pi URL</Txt>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {['http://10.42.0.1:5000', 'http://127.0.0.1:3000'].map((preset) => (
-                  <Pressable key={preset} onPress={() => { S.piUrlDraft = preset; render(); }}
-                    style={{ flex: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: S.piUrlDraft === preset ? C.primary : C.border, backgroundColor: S.piUrlDraft === preset ? '#EEF4FF' : C.canvas, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: S.piUrlDraft === preset ? C.primary : C.navy, fontFamily: MONO }}>{preset.replace(/^https?:\/\//, '')}</Text>
-                  </Pressable>
-                ))}
-              </View>
               <TextInput
                 value={S.piUrlDraft}
                 onChangeText={(v) => act('setPiUrlDraft', v)}
