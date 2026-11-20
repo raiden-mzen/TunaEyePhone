@@ -2042,19 +2042,43 @@ screens.grader = () => {
   const s = S.session, ts = TS();
   const gm = S.graderCheckModal;
   const initials = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '2', '3', '4'];
+  const dayKey = (t) => manila(t).toISOString().slice(0, 10);
+  const todayList = S.records.filter((r) => dayKey(r.createdAt) === dayKey(Date.now()));
+  const kgToday = Math.round(todayList.reduce((acc, r) => acc + (r.weightTenths || 0) / 10, 0));
+  const aPct = todayList.length ? Math.round((todayList.filter((r) => r.final?.grade === 'A').length / todayList.length) * 100) : 0;
   return (
     <Shell idx={1} left={[backBtn('cancelSession'), helpBtn()]}
-      right={[B('Continue', 'graderNext', '', 'primary', validateGraderName(s.grader).length < 1, 'arrow')]}>
-      <View style={[BODY, { gap: 18, paddingTop: 16, paddingBottom: 32 }]}>
-        <Txt k="title" style={{ fontSize: 32, lineHeight: 38, textAlign: 'center' }}>Who is grading?</Txt>
+      right={[B('Start grading', 'graderNext', '', 'primary', validateGraderName(s.grader).length < 1, 'camera')]}>
+      <View style={[BODY, { gap: 14, paddingTop: 8, paddingBottom: 20 }]}>
+        <View style={{ backgroundColor: C.hero, borderRadius: 24, padding: 20, gap: 6, shadowColor: C.hero, shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.78)', letterSpacing: 0.8 }}>LET'S START GRADING</Text>
+          <Text style={{ fontSize: 32 * ts, fontWeight: '800', color: '#fff' }} numberOfLines={1}>{s.grader.trim() || 'Who is grading?'}</Text>
+          <Pressable onPress={() => act('toggleDemoMode')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14 }}>
+            <View>
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#fff' }}>Demo mode</Text>
+              <Text style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.75)' }}>Sample images & simulated grades</Text>
+            </View>
+            <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: S.demo.enabled ? '#fff' : 'rgba(255,255,255,0.28)', padding: 3, justifyContent: 'center', alignItems: S.demo.enabled ? 'flex-end' : 'flex-start' }}>
+              <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: S.demo.enabled ? C.primary : '#fff' }} />
+            </View>
+          </Pressable>
+        </View>
 
-        <Card lift style={{ gap: 16, paddingVertical: 22, paddingHorizontal: 20, borderColor: '#C9D9F7', backgroundColor: '#F8FBFF' }}>
+        <Card lift style={{ gap: 14, paddingVertical: 18, paddingHorizontal: 18 }}>
           <TextInput
-            style={[st.field, { minHeight: 64, borderRadius: 20, fontSize: 22 * ts, fontWeight: '700', paddingHorizontal: 20, borderColor: C.primary, backgroundColor: '#fff' }]}
+            style={[st.field, { minHeight: 58, borderRadius: 18, fontSize: 20 * ts, fontWeight: '700', paddingHorizontal: 18, borderColor: C.primary, backgroundColor: '#fff' }]}
             value={s.grader} onChangeText={(v) => { s.grader = v.slice(0, 15); render(); }}
             placeholder="Enter your name" placeholderTextColor="#8A99AB"
             autoCapitalize="words" autoCorrect={false} maxLength={15} returnKeyType="done"
           />
+          <View style={{ backgroundColor: C.canvas, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>Today at this station</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <View><Text style={{ fontSize: 20, fontWeight: '800', color: C.navy }}>{todayList.length}</Text><Text style={{ fontSize: 12, color: C.text2 }}>Sessions</Text></View>
+              <View><Text style={{ fontSize: 20, fontWeight: '800', color: C.navy }}>{kgToday}</Text><Text style={{ fontSize: 12, color: C.text2 }}>kg graded</Text></View>
+              <View><Text style={{ fontSize: 20, fontWeight: '800', color: C.navy }}>{`${aPct}%`}</Text><Text style={{ fontSize: 12, color: C.text2 }}>Grade A</Text></View>
+            </View>
+          </View>
         </Card>
       </View>
 
@@ -2109,17 +2133,25 @@ screens.grader = () => {
 screens.tutorial = () => {
   const step = S.tutorialStep || 1;
   const info = [
-    { t: '1. Pull out the tray', b: 'Slide the sample tray out from the chamber before placing the tuna cut.' },
-    { t: '2. Place the sample', b: 'Lay the Sashibo core flat and centered inside the guide outline.' },
-    { t: '3. Close and scan', b: 'Close the tray smoothly and tap Scan / Take photo to grade immediately.' },
+    { t: 'Pull out the tray', b: 'Use the chamber handle and make sure the surface is clean.' },
+    { t: 'Place the sample', b: 'Lay the Sashibo core flat and centered inside the outline.' },
+    { t: 'Close and scan', b: 'Close the tray smoothly and capture to grade immediately.' },
   ][step - 1];
   return (
     <Shell idx={2} left={[backBtn('go', 'weight'), helpBtn()]}
       right={[B(step < 3 ? 'Next' : 'Continue', 'tutNext', '', 'primary', false, 'arrow'), B('Close', 'tutClose', '', 'ghost')]}>
-      <View style={[BODY, { gap: 16, alignItems: 'center', justifyContent: 'center', paddingBottom: 16 }]}>
-        <ChamberLine w={Math.min(320, Dimensions.get('window').width - 48)} />
-        <Card lift style={{ width: '100%', gap: 8, alignItems: 'center' }}>
-          <Txt k="h1" style={{ textAlign: 'center' }}>{info.t}</Txt>
+      <View style={[BODY, { gap: 14, alignItems: 'center', justifyContent: 'center', paddingBottom: 16 }]}>
+        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+          {[1, 2, 3].map((n) => (
+            <View key={n} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: n <= step ? C.primary : C.border }} />
+          ))}
+        </View>
+        <View style={{ width: '100%', backgroundColor: C.primary, borderRadius: 26, padding: 20, alignItems: 'center', justifyContent: 'center', shadowColor: C.primary, shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 5 }}>
+          <Text style={{ position: 'absolute', top: 12, right: 18, fontSize: 54, fontWeight: '800', color: 'rgba(255,255,255,0.16)' }}>{`0${step}`}</Text>
+          <ChamberLine w={Math.min(280, Dimensions.get('window').width - 80)} />
+        </View>
+        <Card lift style={{ width: '100%', gap: 6, alignItems: 'center' }}>
+          <Txt k="h1" style={{ textAlign: 'center', fontSize: 24 }}>{info.t}</Txt>
           <Txt k="sub" style={{ textAlign: 'center' }}>{info.b}</Txt>
         </Card>
       </View>
@@ -3035,6 +3067,8 @@ function Paper({ r }) {
 screens.receipt = () => {
   const s = S.session, r = S.records.find((x) => x.id === s.recordId), pr = S.print;
   const sending = pr && pr.state === 'sending', sent = pr && pr.state === 'sent';
+  const g = r.final?.grade || 'B', q = r.quote;
+  const heroBg = GRADE_HERO[g] || C.primary;
   return (
     <Shell idx={6} left={[helpBtn()]}
       right={[
@@ -3042,12 +3076,39 @@ screens.receipt = () => {
         B('Skip', 'skipReceipt', '', '', sending),
         B('Done', 'doneReceipt', '', 'ghost', sending),
       ]}>
-      <View style={[BODY, { gap: 10, paddingBottom: 8 }]}>
-        <View style={{ alignItems: 'center', gap: 6, paddingTop: 6 }}>
-          <Txt k="title" style={{ fontSize: 34 }}>Receipt (58mm)</Txt>
-          <Sub>Print the thermal receipt or skip to save locally and continue.</Sub>
+      <View style={[BODY, { gap: 12, paddingBottom: 16 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Txt k="title" style={{ fontSize: 28 }}>Print receipt</Txt>
+          {chip(`Order ${r.id}`, 'ok')}
         </View>
-        <View style={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}>
+        {q ? (
+          <View style={{ backgroundColor: heroBg, borderRadius: 22, padding: 16, gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff' }}>{g}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '600' }}>Total value</Text>
+                <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff' }}>{fmtMoney(q.totalC)}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.16)', borderRadius: 10, padding: 8 }}>
+                <Text style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.75)' }}>Weight</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{fmtKg(r.weightTenths)}</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.16)', borderRadius: 10, padding: 8 }}>
+                <Text style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.75)' }}>Rate</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{fmtMoney(q.rateC).replace('.00', '') + '/kg'}</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.16)', borderRadius: 10, padding: 8 }}>
+                <Text style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.75)' }}>Grade</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{g}</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
           <View style={{ transform: [{ scale: 0.92 }] }}>
             <Paper r={r} />
           </View>
@@ -3085,19 +3146,38 @@ screens.history = () => {
   const pageCount = Math.max(1, Math.ceil(allList.length / pageSize));
   const page = Math.min(S.ui.histPage || 0, pageCount - 1);
   const list = allList.slice(page * pageSize, (page + 1) * pageSize);
+  const c = counts(), pend = c.pending + c.failed;
   return (
     <Shell idx={0} left={[backBtn('go', 'welcome'), helpBtn()]}>
-      <View style={[BODY, { gap: 12, justifyContent: 'flex-start', paddingTop: 12 }]}>
-        <View style={{ alignItems: 'center', gap: 6 }}>
-          <Txt k="title" style={{ fontSize: 32, textAlign: 'center' }}>Grader Dashboard</Txt>
-          <Sub>{scope === 'mine' ? `Showing records for ${graderName || 'current grader'}` : 'Showing all device records'}</Sub>
+      <View style={[BODY, { gap: 12, justifyContent: 'flex-start', paddingTop: 8 }]}>
+        <View style={{ backgroundColor: C.hero, borderRadius: 24, padding: 18, gap: 12, shadowColor: C.hero, shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#5BE3A3' }} />
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#fff' }}>TunaEye Station 01</Text>
+            </View>
+          </View>
+          <View>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)' }}>Welcome back,</Text>
+            <Text style={{ fontSize: 28, fontWeight: '800', color: '#fff' }}>{graderName || 'Grader'}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {B('Start grading', 'start', '', '', false, 'arrow', { flex: 1, backgroundColor: '#fff', borderColor: '#fff' })}
+            {B(pend ? `Sync (${pend})` : 'Sync', 'goSync', '', '', false, 'refresh', { backgroundColor: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.28)' })}
+          </View>
         </View>
+
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Stat v={allList.length} l="Records" />
+          <Stat v={S.net === 'online' ? 'Online' : 'Offline'} l="Status" k={S.net === 'online' ? C.gA : C.amber} />
+        </View>
+
         <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
           {B('My records', 'histScope', 'mine', scope === 'mine' ? 'primary' : '', false, '', { flex: 1 })}
           {B('All device records', 'histScope', 'all', scope === 'all' ? 'primary' : '', false, '', { flex: 1 })}
         </View>
         {list.length ? list.map((r) => <HistRow key={r.id} r={r} />) : (
-          <Card style={{ alignItems: 'center', gap: 10, padding: 40 }}>
+          <Card style={{ alignItems: 'center', gap: 10, padding: 36 }}>
             <Icon n="list" s={44} c="#7FA6D1" />
             <Txt k="h2">No records yet</Txt>
             <Txt k="sub" style={{ textAlign: 'center' }}>{scope === 'mine' ? 'Your completed gradings will appear here.' : 'Finished gradings will show up here.'}</Txt>
@@ -3154,17 +3234,27 @@ function histDetail(r) {
 
 screens.completion = () => {
   const s = S.session, r = S.records.find((x) => x.id === s.recordId), q = r.quote;
+  const g = r.final?.grade || 'B', heroBg = GRADE_HERO[g] || C.primary;
   return (
     <Bare>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-        <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: C.gAbg, alignItems: 'center', justifyContent: 'center' }}><Icon n="check" s={52} c={C.gA} w={3} /></View>
-        <Txt k="title" style={{ fontSize: 38, lineHeight: 42 }}>Saved</Txt>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>{gradeChip(r.final.grade)}<Text style={{ fontSize: 24, fontWeight: '700', color: C.navy }}>{fmtMoney(q.totalC)}</Text></View>
-        <Txt k="sub">{syncLabel(r)}</Txt>
-        {S.paused ? <Txt>Countdown paused</Txt> : <Txt>{'Starting over in '}<Text style={{ fontWeight: '700' }}>{S.countdown}</Text>{' s'}</Txt>}
-        <View style={{ gap: 16, marginTop: 12, width: '100%', paddingHorizontal: 24 }}>
-          {B('Grade another', 'another', '', 'primary', false, 'arrow')}
-          <View style={{ flexDirection: 'row', gap: 16 }}>{B('Stay', 'stay', '', '', '', '', { flex: 1 })}{B('Finish', 'finish', '', '', '', '', { flex: 1 })}</View>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18, paddingHorizontal: 22 }}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.gAbg, borderWidth: 2, borderColor: C.gA, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon n="check" s={44} c={C.gA} w={3} />
+        </View>
+        <Txt k="title" style={{ fontSize: 32, lineHeight: 36, textAlign: 'center' }}>Results recorded.</Txt>
+        <View style={{ width: '100%', maxWidth: 380, backgroundColor: heroBg, borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, shadowColor: heroBg, shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 5 }}>
+          <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff' }}>{g}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 24, fontWeight: '800', color: '#fff' }}>{q ? fmtMoney(q.totalC) : `Grade ${g}`}</Text>
+            <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.88)', fontWeight: '600' }}>{`${fmtKg(r.weightTenths)} · ${r.id} · ${syncLabel(r)}`}</Text>
+          </View>
+        </View>
+        <View style={{ gap: 12, marginTop: 6, width: '100%', maxWidth: 380 }}>
+          {B(`Grade another (${S.countdown})`, 'another', '', 'primary', false, 'arrow')}
+          <Txt k="det" style={{ textAlign: 'center' }}>{S.paused ? 'Countdown paused' : `Starting next fish automatically in ${S.countdown}s…`}</Txt>
+          <View style={{ flexDirection: 'row', gap: 12 }}>{B('Stay', 'stay', '', '', '', '', { flex: 1 })}{B('Finish', 'finish', '', '', '', '', { flex: 1 })}</View>
         </View>
       </View>
     </Bare>
