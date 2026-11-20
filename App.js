@@ -2985,12 +2985,12 @@ screens.result = () => {
         !tailPrompt ? B('Print receipt', 'confirmQuote', '', 'primary', !p.ok, 'print') : null,
       ]}>
       <View style={[BODY, { gap: 12, paddingBottom: 16 }]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <View style={{ flex: 1 }}>
             <Txt k="title" style={{ fontSize: 28 }}>{tailPrompt ? 'Tail cut needed' : 'Final grade'}</Txt>
             <Txt k="det">{`${s.recordId} · ${s.grader} · ${fmtKg(s.weightTenths)}`}</Txt>
           </View>
-          {tailPrompt ? chip('Action needed', 'amber', 'warn') : r.provisional ? chip('Provisional', 'amber', 'warn') : chip('Graded', 'ok', 'check')}
+          {!tailPrompt && r.provisional ? chip('Provisional', 'amber', 'warn') : null}
         </View>
 
         <Card lift style={{ alignItems: 'center', gap: 8, paddingVertical: 22, backgroundColor: heroBg, borderColor: tailPrompt ? '#EBD59C' : heroBg }}>
@@ -3016,15 +3016,6 @@ screens.result = () => {
                   <Text style={{ color: heroBg, fontSize: 13, fontWeight: '800' }}>{`${pct}%`}</Text>
                 </View>
               </View>
-              <View style={{ width: '88%', marginTop: 8, gap: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '700' }}>{`${TYPES[c.type].short} · Grade ${c.label}`}</Text>
-                  <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '800' }}>{`${pct}%`}</Text>
-                </View>
-                <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' }}>
-                  <View style={{ width: `${Math.min(100, pct)}%`, height: '100%', backgroundColor: '#fff', borderRadius: 4 }} />
-                </View>
-              </View>
             </>
           )}
         </Card>
@@ -3048,7 +3039,7 @@ screens.result = () => {
                 </View>
               </View>
             </Card>
-            {valueCard(s, p)}
+            {p.ok ? valueCard(s, p) : null}
           </>
         )}
 
@@ -3105,16 +3096,18 @@ screens.paired = () => {
   const ecaps = effCaps(s);
   const caps = ['core', 'tail'].map((t) => ecaps.find((c) => c.type === t)).filter(Boolean);
   const avgPct = caps.length ? Math.round((caps.reduce((acc, c) => acc + (c.score || 0), 0) / caps.length) * 1000) / 10 : 0;
-  const panel = (c) => {
+  const miniPanel = (c) => {
     const pct = Math.round((c.score || 0) * 1000) / 10;
+    const gCol = c.outcome === 'accepted' ? (GRADE_HERO[c.label] || C.primary) : C.amber;
     return (
-      <Card key={c.type} style={{ gap: 10 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          {chip(c.type === 'core' ? 'Core' : 'Tail', '')}
-          {chip(`Grade ${c.label} · ${pct}%`, c.outcome === 'accepted' ? 'ok' : 'amber')}
+      <Card key={c.type} style={{ flex: 1, padding: 10, gap: 8, borderRadius: 20 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '800', color: C.navy }}>{c.type === 'core' ? 'Core' : 'Tail'}</Text>
+          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: gCol }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{`${c.label} · ${pct}%`}</Text>
+          </View>
         </View>
-        <ImgFrame style={{ width: '100%', height: 120 }}>{imgFor(c)}</ImgFrame>
-        <Txt k="det">{`${TYPES[c.type].name}${c.overridden ? ` (Override · Model: ${capText(c.raw)})` : ''}`}</Txt>
+        <ImgFrame style={{ width: '100%', height: 92, borderRadius: 14 }}>{imgFor(c)}</ImgFrame>
       </Card>
     );
   };
@@ -3122,59 +3115,38 @@ screens.paired = () => {
   const retakeCap = caps.find((c) => c.outcome !== 'accepted') || caps[caps.length - 1];
   return (
     <Shell idx={5} left={[backBtn('go', 'grader'), retakeCap ? B('Retake', 'retakeType', retakeCap.type, '', '', 'refresh') : null, helpBtn()]}
-      right={[r.status !== 'final' ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Print receipt', 'confirmQuote', '', 'primary', !p.ok, 'print')]}>
-      <View style={[BODY, { gap: 14, paddingBottom: 8 }]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <View>
-            <Txt k="title" style={{ fontSize: 30 }}>Final grade</Txt>
-            <Txt k="det">{`${s.recordId} · ${s.grader} · ${fmtKg(s.weightTenths)}`}</Txt>
-          </View>
-          {r.status === 'final' ? chip('Graded', 'ok', 'check') : chip('Action needed', 'amber', 'warn')}
+      right={fg ? [B('Print receipt', 'confirmQuote', '', 'primary', !p.ok, 'print')] : [B('Expert review', 'expert', '', '', false, 'lock'), B('Override grade', 'override', '', 'primary', false, 'edit')]}>
+      <View style={[BODY, { gap: 12, paddingBottom: 12 }]}>
+        <View>
+          <Txt k="title" style={{ fontSize: 28 }}>Final grade</Txt>
+          <Txt k="det">{`${s.recordId} · ${s.grader} · ${fmtKg(s.weightTenths)}`}</Txt>
         </View>
 
         {fg ? (
-          <Card lift style={{ alignItems: 'center', gap: 10, paddingVertical: 22, backgroundColor: GRADE_HERO[fg], borderColor: GRADE_HERO[fg] }}>
-            <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)' }}>
-              <Text style={{ fontSize: 50 * TS(), fontWeight: '800', color: '#fff' }}>{fg}</Text>
+          <Card lift style={{ alignItems: 'center', gap: 10, paddingVertical: 20, backgroundColor: GRADE_HERO[fg], borderColor: GRADE_HERO[fg] }}>
+            <View style={{ width: 82, height: 82, borderRadius: 41, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)' }}>
+              <Text style={{ fontSize: 46 * TS(), fontWeight: '800', color: '#fff' }}>{fg}</Text>
             </View>
-            <Text style={{ fontSize: 26 * TS(), fontWeight: '800', color: '#fff' }}>{`Grade ${fg}`}</Text>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.9)' }}>{GRADE_SUB[fg] || ''}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 14 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' }}>Avg confidence</Text>
-              <View style={{ backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
-                <Text style={{ color: GRADE_HERO[fg], fontSize: 13, fontWeight: '800' }}>{`${avgPct}%`}</Text>
-              </View>
-            </View>
-            <View style={{ width: '90%', gap: 8, marginTop: 6 }}>
-              {caps.map((c) => {
-                const cpct = Math.round((c.score || 0) * 1000) / 10;
-                return (
-                  <View key={c.type} style={{ gap: 4 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{`${TYPES[c.type].short} · Grade ${c.label}`}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>{`${cpct}%`}</Text>
-                    </View>
-                    <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' }}>
-                      <View style={{ width: `${Math.min(100, cpct)}%`, height: '100%', backgroundColor: '#fff', borderRadius: 4 }} />
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
+            <Text style={{ fontSize: 24 * TS(), fontWeight: '800', color: '#fff' }}>{`Grade ${fg}`}</Text>
+            <Text style={{ fontSize: 13.5, fontWeight: '600', color: 'rgba(255,255,255,0.9)' }}>{`${GRADE_SUB[fg] || ''} · Avg ${avgPct}%`}</Text>
           </Card>
         ) : (
-          <Card style={{ flexDirection: 'row', gap: 14, alignItems: 'center', backgroundColor: C.amberbg, borderColor: '#EBD59C' }}>
-            <Icon n="warn" s={34} c={C.amber} />
-            <View style={{ flex: 1 }}>
-              <Txt k="h2" style={{ color: C.amber }}>Manual override required</Txt>
-              <Txt k="sub" style={{ color: '#5F3B00' }}>{r.reason || 'Override or ask an expert before pricing.'}</Txt>
+          <Card lift style={{ gap: 10, backgroundColor: '#FFF9EC', borderColor: '#EBD59C', padding: 18 }}>
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+              <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFF0CC', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon n="warn" s={22} c={C.amber} w={2.5} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: C.navy }}>Manual override required</Text>
+                <Text style={{ fontSize: 13.5, color: '#6E4600' }}>{r.reason || 'Override or ask an expert before pricing.'}</Text>
+              </View>
             </View>
           </Card>
         )}
 
-        {valueCard(s, p)}
-        <View style={{ gap: 10 }}>{caps.map(panel)}</View>
-        <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a="override" icon="edit" />
+        <View style={{ flexDirection: 'row', gap: 10 }}>{caps.map(miniPanel)}</View>
+        {fg && p.ok ? valueCard(s, p) : null}
+        {fg ? <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a="override" icon="edit" /> : null}
       </View>
     </Shell>
   );
