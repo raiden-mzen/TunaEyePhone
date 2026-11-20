@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
-import { PI_CONFIG, piUrl } from './config';
+import { PI_CONFIG, derivePiCameraUrls, piUrl } from './config';
 import { GRADE_LETTER } from './types';
 
 async function fetchT(url, options, ms) {
@@ -24,12 +24,22 @@ export async function checkPiStatus(apiUrl = PI_CONFIG.apiUrl, attempts = 3) {
   throw last;
 }
 
-export async function capturePiSnapshot(apiUrl = PI_CONFIG.apiUrl) {
+export async function capturePiSnapshot(apiUrl = PI_CONFIG.apiUrl, snapshotUrlOverride = null) {
+  const urls = derivePiCameraUrls(apiUrl, null, snapshotUrlOverride);
+  const fallbackUrl = piUrl(PI_CONFIG.paths.snapshot, urls.apiUrl);
   let r;
   try {
-    r = await fetchT(piUrl(PI_CONFIG.paths.snapshot, apiUrl), { cache: 'no-store' }, PI_CONFIG.snapshotTimeout);
+    r = await fetchT(urls.snapshotUrl, { cache: 'no-store' }, PI_CONFIG.snapshotTimeout);
   } catch (e) {
-    throw new Error(e.name === 'AbortError' ? 'Pi camera snapshot timed out.' : 'Cannot reach Raspberry Pi camera.');
+    if (urls.snapshotUrl !== fallbackUrl) {
+      try {
+        r = await fetchT(fallbackUrl, { cache: 'no-store' }, PI_CONFIG.snapshotTimeout);
+      } catch (e2) {
+        throw new Error(e2.name === 'AbortError' ? 'Pi camera snapshot timed out.' : 'Cannot reach Raspberry Pi camera.');
+      }
+    } else {
+      throw new Error(e.name === 'AbortError' ? 'Pi camera snapshot timed out.' : 'Cannot reach Raspberry Pi camera.');
+    }
   }
   if (!r.ok) throw new Error(`Pi camera snapshot failed (HTTP ${r.status})`);
   const blob = await r.blob();

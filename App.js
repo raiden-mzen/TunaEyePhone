@@ -44,7 +44,7 @@ import { syncRecord } from './src/sync/syncRecord';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { gradeWithPi, checkPiStatus, capturePiSnapshot } from './src/pi/client';
-import { PI_CONFIG, normalizePiUrl } from './src/pi/config';
+import { PI_CONFIG, normalizePiUrl, derivePiCameraUrls } from './src/pi/config';
 import { PI_IMAGE_TYPE, MIN_CONFIDENCE, PROVISIONAL_MIN_CONFIDENCE } from './src/pi/types';
 import {
   PENDING_SYNC_GRADERS_KEY,
@@ -129,7 +129,7 @@ const S = {
   schedule: { id: 'PS-DEMO-03', version: 3, rates: { A: 62000, B: 50000, C: 38000 }, effective: 'Oct 1, 2026', validUntil: 'Oct 31, 2026', expired: false, label: 'Demo fixture rates (not an approved schedule)' },
   startup: { state: 'idle', checks: [], fail: null },
   session: null, auth: null, login: null, dialog: null, toast: null, help: false, drawer: false, navDock: false,
-  onboarded: false, onbStep: 0, phoneLinked: false, piStatus: 'disconnected', piApiUrl: PI_CONFIG.apiUrl, piUrlDraft: PI_CONFIG.apiUrl, piStreamUrl: null, camReady: false, kioskId: '', scanError: '', lastGrader: '',
+  onboarded: false, onbStep: 0, phoneLinked: false, piStatus: 'disconnected', piApiUrl: PI_CONFIG.apiUrl, piUrlDraft: PI_CONFIG.apiUrl, piStreamUrl: derivePiCameraUrls(PI_CONFIG.apiUrl).streamUrl, piSnapshotUrl: derivePiCameraUrls(PI_CONFIG.apiUrl).snapshotUrl, camSource: 'pi', camReady: false, kioskId: '', scanError: '', lastGrader: '',
   tips: true, coached: {}, barH: 0,
   ui: {
     large: false, batchOpen: false, recFilter: 'all', recSearch: '', recSel: null, reviewGrade: null, reviewReason: '', expertCtx: null,
@@ -500,7 +500,7 @@ async function doPiSnapshot() {
   S.busy = true; render();
   const tok = s.id;
   try {
-    const uri = await capturePiSnapshot(S.piApiUrl);
+    const uri = await capturePiSnapshot(S.piApiUrl, S.piSnapshotUrl);
     S.busy = false;
     if (!S.session || S.session.id !== tok || S.screen !== 'camera') { render(); return; }
     s.pending = { id: uid(), type: s.sampleType, ts: Date.now(), uri, source: 'pi-camera' };
@@ -850,31 +850,29 @@ function parseKioskCode(data) {
   try {
     const qr = JSON.parse(str);
 
-    if (
-      qr &&
-      typeof qr.apiUrl === 'string' &&
-      /^https?:\/\//i.test(qr.apiUrl.trim())
-    ) {
-      const apiUrl = normalizePiUrl(qr.apiUrl);
-
+    if (qr && typeof qr.apiUrl === 'string' && qr.apiUrl.trim()) {
+      const urls = derivePiCameraUrls(qr.apiUrl, qr.streamUrl || null, qr.snapshotUrl || null);
       return {
         kioskId: qr.kioskId || 'KIOSK-01',
         ssid: qr.ssid || 'TunaRpi',
-        apiUrl,
-        streamUrl: qr.streamUrl || null,
+        apiUrl: urls.apiUrl,
+        streamUrl: urls.streamUrl,
+        snapshotUrl: urls.snapshotUrl,
       };
     }
   } catch {
-    // Try legacy pairing URL or direct URL
+    // Try legacy pairing URL or direct host/URL
   }
 
-  // Support direct HTTP/HTTPS URL QR code
-  if (/^https?:\/\//i.test(str)) {
+  // Support direct HTTP/HTTPS URL or host:port QR code (e.g. "10.42.0.1:5000" or "http://10.42.0.1:5000")
+  if (/^(https?:\/\/)?[A-Za-z0-9.-]+:\d+(\/.*)?$/i.test(str) || /^https?:\/\//i.test(str)) {
+    const urls = derivePiCameraUrls(str);
     return {
       kioskId: 'KIOSK-01',
       ssid: 'TunaRpi',
-      apiUrl: normalizePiUrl(str),
-      streamUrl: null,
+      apiUrl: urls.apiUrl,
+      streamUrl: urls.streamUrl,
+      snapshotUrl: urls.snapshotUrl,
     };
   }
 
@@ -885,11 +883,13 @@ function parseKioskCode(data) {
     m &&
     /^(tunaeye:\/\/pair|https:\/\/kiosk\.tunaeye\.example\/pair)/.test(str)
   ) {
+    const urls = derivePiCameraUrls(S.piApiUrl || DEFAULT_PI_API);
     return {
       kioskId: m[1],
       ssid: 'TunaRpi',
-      apiUrl: S.piApiUrl || DEFAULT_PI_API,
-      streamUrl: null,
+      apiUrl: urls.apiUrl,
+      streamUrl: urls.streamUrl,
+      snapshotUrl: urls.snapshotUrl,
     };
   }
 
@@ -910,16 +910,19 @@ function connectPhone(config) {
   if (!s) return;
 
   const cfg = typeof config === 'string'
-    ? { kioskId: config, apiUrl: S.piApiUrl || DEFAULT_PI_API, streamUrl: null }
+    ? { kioskId: config, apiUrl: S.piApiUrl || DEFAULT_PI_API, streamUrl: null, snapshotUrl: null }
     : (config || {});
+
+  const urls = derivePiCameraUrls(cfg.apiUrl || S.piApiUrl || DEFAULT_PI_API, cfg.streamUrl || null, cfg.snapshotUrl || null);
 
   s.phone = 'connected';
 
   S.phoneLinked = true;
   S.kioskId = cfg.kioskId || 'KIOSK-01';
-  S.piApiUrl = normalizePiUrl(cfg.apiUrl) || S.piApiUrl || DEFAULT_PI_API;
-  S.piUrlDraft = S.piApiUrl;
-  S.piStreamUrl = cfg.streamUrl || null;
+  S.piApiUrl = urls.apiUrl;
+  S.piUrlDraft = urls.apiUrl;
+  S.piStreamUrl = urls.streamUrl;
+  S.piSnapshotUrl = urls.snapshotUrl;
   S.piStatus = 'connected';
   S.scanError = '';
   AsyncStorage.setItem(PI_URL_STORAGE_KEY, S.piApiUrl).catch(() => { });
@@ -1201,6 +1204,7 @@ const A = {
   },
   capture() { doCapture(); },
   capturePi() { doPiSnapshot(); },
+  setCamSource(src) { S.camSource = src; render(); },
   demoScan() {
     const s = S.session; if (!s) return;
     s.pending = { id: uid(), type: s.sampleType || 'core', ts: Date.now(), uri: null, source: 'demo' };
@@ -1675,13 +1679,13 @@ function Shell({ idx = 0, left = [], right = [], children }) {
         >
           <View style={{ gap: 10 }}>
             {sec.length ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-                {sec.map((e, i) => React.cloneElement(e, { key: 's' + i, bar: true, style: [{ minHeight: 48 }, e.props.style] }))}
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                {sec.map((e, i) => React.cloneElement(e, { key: 's' + i, bar: true, style: [{ minHeight: 46, flex: 1 }, e.props.style] }))}
               </View>
             ) : null}
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-              {backEl ? React.cloneElement(backEl, { key: 'back', kind: '', style: [{ minHeight: 54, minWidth: 112, flex: prim.length ? 0 : 1 }] }) : null}
-              {prim.map((e, i) => React.cloneElement(e, { key: 'p' + i, style: [{ minHeight: 54, flex: 1 }, e.props.style] }))}
+              {backEl ? React.cloneElement(backEl, { key: 'back', kind: '', style: [{ minHeight: 52, minWidth: 104, flex: prim.length ? 0 : 1 }] }) : null}
+              {prim.map((e, i) => React.cloneElement(e, { key: 'p' + i, style: [{ minHeight: 52, flex: 1 }, e.props.style] }))}
             </View>
           </View>
         </View>
@@ -2231,40 +2235,45 @@ screens.pair = () => {
   return (
     <Shell idx={2} left={[backBtn('go', 'grader'), helpBtn()]} right={[B('Continue', 'pairNext', '', 'primary', !ok, 'arrow')]}>
       <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
-        <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Connect to kiosk</Txt>
-        <Sub>Scan the kiosk QR code or connect directly to your Raspberry Pi URL.</Sub>
+        <Txt k="title" style={{ fontSize: 30, paddingTop: 4, textAlign: 'center' }}>Connect to Raspberry Pi</Txt>
+        <Sub>Scan the RPi QR code (10.42.0.1:5000) or tap a preset below.</Sub>
         {ok ? (
-          <Card style={{ width: '100%', alignItems: 'center', gap: 10, backgroundColor: C.gAbg, borderColor: '#BFE3D2', paddingVertical: 32 }}>
+          <Card lift style={{ width: '100%', alignItems: 'center', gap: 10, backgroundColor: C.gAbg, borderColor: '#BFE3D2', paddingVertical: 28 }}>
             <Icon n="check" s={56} c={C.gA} w={3} /><Txt k="h2" style={{ color: C.gA }}>Connected</Txt>
-            <Txt k="sub" style={{ color: C.gA }}>{`${S.kioskId || 'KIOSK-01'} · ${S.piApiUrl}`}</Txt>
+            <Txt k="sub" style={{ color: C.gA, textAlign: 'center' }}>{`${S.kioskId || 'KIOSK-01'} · ${S.piApiUrl}`}</Txt>
+            {S.piStreamUrl ? <Txt k="det" style={{ color: C.gA }}>{`Camera: ${S.piSnapshotUrl}`}</Txt> : null}
             {B('Disconnect / change', 'repair', '', 'small ghost')}
           </Card>
         ) : (
           <>
+            <Scanner />
+            {S.scanError ? chip(S.scanError, 'err', 'warn', { alignSelf: 'center' }) : null}
             <Card style={{ width: '100%', gap: 10 }}>
               <Txt k="label">Direct Raspberry Pi URL</Txt>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {['http://10.42.0.1:5000', 'http://127.0.0.1:3000'].map((preset) => (
+                  <Pressable key={preset} onPress={() => { S.piUrlDraft = preset; render(); }}
+                    style={{ flex: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: S.piUrlDraft === preset ? C.primary : C.border, backgroundColor: S.piUrlDraft === preset ? '#EEF4FF' : C.canvas, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: S.piUrlDraft === preset ? C.primary : C.navy, fontFamily: MONO }}>{preset.replace(/^https?:\/\//, '')}</Text>
+                  </Pressable>
+                ))}
+              </View>
               <TextInput
                 value={S.piUrlDraft}
                 onChangeText={(v) => act('setPiUrlDraft', v)}
-                placeholder="http://127.0.0.1:3000"
+                placeholder="http://10.42.0.1:5000"
                 placeholderTextColor={C.text2}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
                 style={{
                   borderWidth: 1, borderColor: C.border, borderRadius: 12,
-                  paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 * TS(),
+                  paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 * TS(),
                   color: C.navy, backgroundColor: C.canvas, fontFamily: MONO,
                 }}
               />
               {B(S.piStatus === 'connecting' ? 'Connecting…' : 'Connect to Raspberry Pi', 'connectPiUrl', '', 'primary', S.piStatus === 'connecting', 'arrow')}
             </Card>
-            <Scanner />
-            {S.scanError ? chip(S.scanError, 'err', 'warn', { alignSelf: 'center' }) : null}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8 }}>
-              <Image source={IMG.qr} style={{ width: 44, height: 44 }} resizeMode="contain" />
-              <Txt k="det" style={{ flexShrink: 1 }}>Or point your phone camera at the square QR code on the kiosk screen.</Txt>
-            </View>
             <DemoPill label="Skip for demo" a="skipDemo" icon="arrow" />
           </>
         )}
@@ -2386,11 +2395,25 @@ function PhoneCam({ type }) {
     </>
   );
 }
-const camView = (t) => (
-  <ImgFrame style={{ width: '100%', aspectRatio: 1 }}>
-    <PhoneCam type={t} />
-  </ImgFrame>
-);
+const camView = (t) => {
+  const showPiStream = !S.demo.enabled && S.camSource === 'pi' && S.phoneLinked && S.piStreamUrl;
+  return (
+    <ImgFrame style={{ width: '100%', aspectRatio: 4 / 3 }}>
+      {showPiStream ? (
+        <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#0F1B2B', alignItems: 'center', justifyContent: 'center' }}>
+          <Image source={{ uri: S.piStreamUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Brackets size={170} />
+          <View style={{ position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(15,27,43,0.75)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.online }} />
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{`RPi Stream · ${S.piStreamUrl.replace(/^https?:\/\//, '')}`}</Text>
+          </View>
+        </View>
+      ) : (
+        <PhoneCam type={t} />
+      )}
+    </ImgFrame>
+  );
+};
 
 /* soft tinted pill, centered */
 function DemoPill({ label, a, icon = 'camera' }) {
@@ -2438,23 +2461,32 @@ screens.align = () => {
 screens.camera = () => {
   const s = S.session, t = s.sampleType || 'core', linked = s.phone === 'connected';
   const isTail = t === 'tail';
+  const usePiCam = !S.demo.enabled && S.camSource === 'pi';
   return (
     <Shell idx={isTail ? 4 : 3} left={[backBtn('go', isTail ? 'result' : 'grader'), helpBtn()]}
       right={[
-        S.demo.enabled ? B('Demo scan', 'demoScan', '', 'primary', S.busy || S.picking, 'camera') : null,
         B('Upload image', 'uploadImage', '', '', S.busy || S.picking, 'gallery'),
-        B('Pi camera', 'capturePi', '', '', S.busy || S.picking || !linked, 'camera'),
-        !S.demo.enabled ? B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera') : null,
+        S.demo.enabled
+          ? B('Demo scan', 'demoScan', '', 'primary', S.busy || S.picking, 'camera')
+          : usePiCam
+            ? B(S.busy ? 'Capturing…' : 'Scan sample', 'capturePi', '', 'primary', S.busy || S.picking || !linked, 'camera')
+            : B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera'),
       ]}>
-      <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+      <View style={[BODY, { gap: 10, alignItems: 'center', paddingBottom: 8 }]}>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
           {chip(isTail ? 'Supplementary · Tail cut' : 'Primary · Sashibo core', isTail ? 'amber' : 'info')}
           {chip(`${s.recordId} · ${fmtKg(s.weightTenths)}`, '')}
         </View>
-        <Txt k="title" style={{ fontSize: 32, paddingTop: 2, textAlign: 'center' }}>
+        <Txt k="title" style={{ fontSize: 30, paddingTop: 2, textAlign: 'center' }}>
           {isTail ? 'Show the tail cut face' : 'Place the core in the frame'}
         </Txt>
-        <Sub>{isTail ? 'Face the cut surface to the camera, centered in the guide.' : 'Lay it flat and centered, in even light. Use Pi camera, phone camera, or upload.'}</Sub>
+        <Sub>{isTail ? 'Face the cut surface to the camera, centered in the guide.' : 'Lay it flat and centered, in even light.'}</Sub>
+        {!S.demo.enabled ? (
+          <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+            {B('RPi Stream', 'setCamSource', 'pi', usePiCam ? 'small primary' : 'small', false, 'camera', { flex: 1 })}
+            {B('Phone Camera', 'setCamSource', 'phone', !usePiCam ? 'small primary' : 'small', false, 'camera', { flex: 1 })}
+          </View>
+        ) : null}
         {camView(t)}
         {S.demo.quality === 'blurry' ? chip('Check focus', 'amber', 'warn', { alignSelf: 'center' }) : null}
       </View>
