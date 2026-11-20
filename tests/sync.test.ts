@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { GradingRecordInsert } from '../src/lib/database.types.ts'
 import { imagePathFor, mapCaptureToRow, rowId } from '../src/sync/mapping.ts'
-import { syncRecord, type CloudClient } from '../src/sync/syncRecord.ts'
+import { nearlyEqual, syncRecord, type CloudClient } from '../src/sync/syncRecord.ts'
 import type { LocalRecord } from '../src/sync/types.ts'
 
 const USER = '11111111-1111-4111-8111-111111111111'
@@ -120,4 +120,9 @@ test('re-sync after an expert decision updates the same rows', async () => {
   r.decisions = [{ grade: 'C', reason: 'Expert review', manual: false }]
   await syncRecord(deps(f.cloud), r)
   assert.equal(f.rows.size, 2); assert.equal(f.rows.get(`${r.uuid}-core`)?.grade, 'C'); assert.equal(f.rows.get(`${r.uuid}-core`)?.override_grade, 'C')
+})
+
+test('numeric verification tolerance accepts <= 1e-3 float rounding', () => {
+  assert.equal(nearlyEqual(93.12, 93.1205), true)
+  assert.equal(nearlyEqual(93.12, 93.122), false)
 })

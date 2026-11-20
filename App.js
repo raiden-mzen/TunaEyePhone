@@ -42,8 +42,18 @@ import { persistEvidence, readEvidence } from './src/sync/evidence';
 import { loadStoredRecords, saveStoredRecords } from './src/sync/localStore';
 import { syncRecord } from './src/sync/syncRecord';
 import * as ImagePicker from 'expo-image-picker';
-import { gradeWithPi, checkPiStatus } from './src/pi/client';
-import { PI_IMAGE_TYPE, MIN_CONFIDENCE } from './src/pi/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { gradeWithPi, checkPiStatus, capturePiSnapshot } from './src/pi/client';
+import { PI_CONFIG, normalizePiUrl } from './src/pi/config';
+import { PI_IMAGE_TYPE, MIN_CONFIDENCE, PROVISIONAL_MIN_CONFIDENCE } from './src/pi/types';
+import {
+  PENDING_SYNC_GRADERS_KEY,
+  validateGraderName,
+  findGraderMatches,
+  getDashboardHistory,
+  shouldSkipPlacementTutorial,
+  recordPlacementSession,
+} from './src/kioskFlow';
 
 let fontsLoaded = false;
 
@@ -90,7 +100,7 @@ const TYPES = { core: { name: 'Sashibo core', short: 'Core' }, tail: { name: 'Ta
 const other = (t) => (t === 'core' ? 'tail' : 'core');
 const ORIGIN = { model: 'Model', expert: 'Expert', manual: 'Manual override' };
 const QUICK_REASONS = ['Color is clearly darker', 'Color is clearly lighter', 'Model looks wrong for this cut', 'Photo quality was poor', "Matches the buyer's sample"];
-const STEPS = ['Details', 'Sample', 'Connect', 'Align', 'Capture', 'Result', 'Receipt'];
+const STEPS = ['Details', 'Connect', 'Core', 'Tail', 'Grade', 'Receipt'];
 const HERO_SCREENS = ['startup', 'welcome', 'onboarding'];
 /* ====================================================================== */
 /* helpers: money & weight (integer fixed-point)                           */
@@ -119,17 +129,18 @@ const S = {
   schedule: { id: 'PS-DEMO-03', version: 3, rates: { A: 62000, B: 50000, C: 38000 }, effective: 'Oct 1, 2026', validUntil: 'Oct 31, 2026', expired: false, label: 'Demo fixture rates (not an approved schedule)' },
   startup: { state: 'idle', checks: [], fail: null },
   session: null, auth: null, login: null, dialog: null, toast: null, help: false, drawer: false, navDock: false,
-  onboarded: false, onbStep: 0, phoneLinked: false,piStatus: 'disconnected', camReady: false, kioskId: '', scanError: '', lastGrader: '',
+  onboarded: false, onbStep: 0, phoneLinked: false, piStatus: 'disconnected', piApiUrl: PI_CONFIG.apiUrl, piUrlDraft: PI_CONFIG.apiUrl, piStreamUrl: null, camReady: false, kioskId: '', scanError: '', lastGrader: '',
   tips: true, coached: {}, barH: 0,
   ui: {
     large: false, batchOpen: false, recFilter: 'all', recSearch: '', recSel: null, reviewGrade: null, reviewReason: '', expertCtx: null,
-    ovGrade: null, ovReason: '', ovAck: false, ovTarget: null, histSel: null,
+    ovGrade: null, ovReason: '', ovAck: false, ovTarget: null, ovPin: '', ovPinError: '', histSel: null, histScope: 'mine', histPage: 0,
   },
+  syncModal: null, slowWifiModal: null, graderCheckModal: null, cannotDetermineModal: null, skipReceiptModal: false, tutorialStep: 1,
   demo: { queue: [], next: 'A', quality: 'ok', printer: 'ok', timeoutOnce: false, cloudFailNext: 0, startupFault: 'none' },
   records: [], counter: 7, lastAck: null, syncing: { active: false, done: 0, total: 0 },
-  busy: false, picking: false, flash: false, print: null, receiptSaved: false, countdown: 30, paused: false, timers: {}, lock: 0,
+  busy: false, picking: false, flash: false, print: null, receiptSaved: false, countdown: 3, paused: false, timers: {}, lock: 0,
 };
-let rerender = () => {};
+let rerender = () => { };
 let persistTimer = null;
 const persistSoon = () => { clearTimeout(persistTimer); persistTimer = setTimeout(() => { saveStoredRecords(S.records); }, 400); };
 const render = () => { rerender(); persistSoon(); };
@@ -146,20 +157,90 @@ function effCaps(s) {
     return d ? { ...c, label: d.grade, outcome: 'accepted', overridden: true, raw: c } : c;
   });
 }
+function combineGrades(coreCap, tailCap) {
+  const keys = ['GRADE_A', 'GRADE_B', 'GRADE_C'];
+  const labels = ['A', 'B', 'C'];
+  const hasScores = keys.every((k) => typeof coreCap.scores?.[k] === 'number' && typeof tailCap.scores?.[k] === 'number');
+  if (hasScores) {
+    const blended = keys.map((k) => ((coreCap.scores[k] || 0) + (tailCap.scores[k] || 0)) / 2);
+    const winner = blended.reduce((best, val, idx) => (val > blended[best] ? idx : best), 0);
+    return labels[winner];
+  }
+  const points = { A: 3, B: 2, C: 1 };
+  const cConf = coreCap.score || 0;
+  const tConf = tailCap.score || 0;
+  const w = cConf + tConf || 1;
+  const score = ((points[coreCap.label || 'C'] * cConf) + (points[tailCap.label || 'C'] * tConf)) / w;
+  return score >= 2.5 ? 'A' : score >= 1.5 ? 'B' : 'C';
+}
 function resolve(s) {
-  const caps = effCaps(s), acc = caps.filter((c) => c.outcome === 'accepted'), dec = (s.decisions || []).filter((d) => !d.target).slice(-1)[0];
+  const caps = effCaps(s), dec = (s.decisions || []).filter((d) => !d.target).slice(-1)[0];
+  const provisional = s.tailAvailability === 'not_available';
   if (dec) return dec.grade
-    ? { status: 'final', grade: dec.grade, basis: dec.manual ? 'Manual override' : 'Expert decision', origin: dec.manual ? 'manual' : 'expert' }
+    ? { status: 'final', grade: dec.grade, basis: dec.manual ? 'Manual override' : 'Expert decision', origin: dec.manual ? 'manual' : 'expert', provisional }
     : { status: 'unresolved', reason: 'Expert left this unresolved' };
-  const ov = acc.filter((c) => c.overridden);
+  const core = caps.find((c) => c.type === 'core');
+  const tail = caps.find((c) => c.type === 'tail');
+  const ov = caps.filter((c) => c.overridden);
   const note = ov.length ? ' (override on ' + ov.map((c) => TYPES[c.type].short).join(' + ') + ')' : '';
   const origin = ov.length ? 'manual' : 'model';
-  if (caps.length === 1 && acc.length === 1) return { status: 'final', grade: acc[0].label, basis: 'Single sample: ' + TYPES[acc[0].type].name + note, origin };
-  if (caps.length >= 2 && acc.length === 2) {
-    if (acc[0].label === acc[1].label) return { status: 'final', grade: acc[0].label, basis: 'Both samples agree' + note, origin };
-    return { status: 'unresolved', conflict: true, reason: 'Samples disagree' };
+
+  // Single sample (or Sashibo core primary flow)
+  if (core && !tail) {
+    if (core.outcome === 'invalid') return { status: 'unresolved', reason: 'Sashibo core image was rejected' };
+    if (core.overridden) return { status: 'final', grade: core.label, basis: 'Manual override (Sashibo core)', origin: 'manual', provisional };
+    if (core.outcome === 'accepted' && core.label !== 'C') {
+      return { status: 'final', grade: core.label, basis: 'Sashibo core accepted' + note, origin };
+    }
+    if (provisional) {
+      if (core.label && (core.score || 0) >= PROVISIONAL_MIN_CONFIDENCE) {
+        return { status: 'final', grade: core.label, basis: 'Provisional (Tail-Cut not available)', origin, provisional: true };
+      }
+      return { status: 'unresolved', conflict: true, provisional: true, reason: 'Provisional confidence too low; manual override required' };
+    }
+    return {
+      status: 'unresolved',
+      tailNeeded: true,
+      reason: core.label === 'C' && core.outcome === 'accepted'
+        ? 'Sashibo core is Grade C. Capture supplementary Tail-Cut or continue provisionally.'
+        : 'Sashibo core confidence is below 75%. Capture supplementary Tail-Cut or continue provisionally.',
+    };
   }
-  if (caps.length && acc.length < caps.length) return { status: 'unresolved', reason: 'A sample result is uncertain or rejected' };
+
+  // Fallback if only tail was captured (e.g., demo/legacy record)
+  if (!core && tail) {
+    if (tail.outcome === 'accepted') return { status: 'final', grade: tail.label, basis: 'Tail cut' + note, origin };
+    return { status: 'unresolved', reason: 'Tail cut result is uncertain or rejected' };
+  }
+
+  // Both Sashibo core and Tail cut captured
+  if (core && tail) {
+    if (core.outcome === 'invalid' || tail.outcome === 'invalid') {
+      return { status: 'unresolved', reason: 'One of the sample images was rejected' };
+    }
+    if (tail.overridden) return { status: 'final', grade: tail.label, basis: 'Manual override (Tail cut)', origin: 'manual' };
+    if (core.overridden && tail.outcome === 'accepted' && core.label === tail.label) {
+      return { status: 'final', grade: core.label, basis: 'Both samples agree' + note, origin };
+    }
+    const avgConf = ((core.score || 0) + (tail.score || 0)) / 2;
+    const bothBelow = core.outcome !== 'accepted' && tail.outcome !== 'accepted';
+    const severeDisagreement = (core.label === 'A' && tail.label === 'C') || (core.label === 'C' && tail.label === 'A');
+    if (bothBelow || avgConf < MIN_CONFIDENCE || severeDisagreement) {
+      return {
+        status: 'unresolved',
+        conflict: true,
+        reason: severeDisagreement
+          ? `Severe disagreement: Core (${core.label}) vs Tail (${tail.label})`
+          : `Combined confidence (${Math.round(avgConf * 100)}%) is below 75%`,
+      };
+    }
+    if (core.label === tail.label) {
+      return { status: 'final', grade: core.label, basis: 'Sashibo core and Tail cut agree' + note, origin };
+    }
+    const blended = combineGrades(core, tail);
+    return { status: 'final', grade: blended, basis: `Blended Sashibo (${core.label}) + Tail (${tail.label})` + note, origin };
+  }
+
   return { status: 'unresolved', reason: 'No accepted sample' };
 }
 function priceFor(s) {
@@ -176,7 +257,11 @@ function withOverride(decs, grade, target, extra = {}) {
   const kept = decs.filter((d) => !(d.manual && (t === undefined || !d.target || d.target === t)));
   return [...kept, { id: uid(), grade, manual: true, target: t, ...extra }];
 }
-const screenAfterGrade = (s) => (s.captures.length > 1 ? 'paired' : (s.captures[s.captures.length - 1] || {}).outcome === 'accepted' ? 'result' : 'invalid');
+const screenAfterGrade = (s) => {
+  if (s.captures.length > 1) return 'paired';
+  const last = s.captures[s.captures.length - 1] || {};
+  return last.outcome === 'invalid' ? 'invalid' : 'result';
+};
 
 /* ---------- seed data ---------- */
 function seed() {
@@ -212,7 +297,7 @@ function newSession() {
   const d = new Date(); const ymd = d.getFullYear() + pad(d.getMonth() + 1, 2) + pad(d.getDate(), 2);
   const idPrefix = `TE-${ymd}-`; // persisted records survive restarts: never reuse a local id
   S.counter = Math.max(S.counter, ...S.records.filter((x) => x.id.startsWith(idPrefix)).map((x) => parseInt(x.id.slice(idPrefix.length), 10) + 1 || 0));
-  S.session = { id: uid(), recordId: `TE-${ymd}-${pad(S.counter++)}`, weightStr: '', grader: S.lastGrader || '', phone: S.phoneLinked ? 'connected' : 'waiting', weightTenths: 0, batch: '', sampleType: null, sampleTypes: [], captures: [], attempts: [], decisions: [], pending: null, job: null, weightCorrections: 0, editingWeight: false, startedAt: Date.now() };
+  S.session = { id: uid(), recordId: `TE-${ymd}-${pad(S.counter++)}`, weightStr: '', grader: S.lastGrader || '', phone: S.phoneLinked ? 'connected' : 'waiting', weightTenths: 0, batch: '', sampleType: 'core', sampleTypes: ['core'], tailAvailability: 'pending', tailPromptOpen: false, captures: [], attempts: [], decisions: [], pending: null, job: null, weightCorrections: 0, editingWeight: false, startedAt: Date.now() };
   S.ui.batchOpen = false; S.print = null;
 }
 function persist(s) {
@@ -265,17 +350,76 @@ async function syncBatch(filter) {
 const syncNow = () => syncBatch(needsSync);
 const retryFailed = () => syncBatch((r) => needsSync(r) && r.sync === 'failed');
 const counts = () => ({ pending: S.records.filter((r) => r.sync === 'pending').length, syncing: S.records.filter((r) => r.sync === 'syncing').length, failed: S.records.filter((r) => r.sync === 'failed').length, synced: S.records.filter((r) => r.sync === 'synced').length });
-const syncLabel = (r) => ({ local: 'Saved on device • Not yet closed', pending: 'Saved on device • Upload pending', syncing: 'Uploading…', synced: 'Uploaded', failed: 'Upload failed • Will retry' }[r.sync]);
+const syncLabel = (r) => ({ local: 'Saved locally', pending: 'Saved locally', syncing: 'Uploading…', synced: 'Synced', failed: 'Retry needed' }[r.sync]);
+
+async function syncPendingRecords({ limit = 200, graders } = {}) {
+  const selected = Array.isArray(graders) ? graders.map((g) => validateGraderName(g).toLowerCase()).filter(Boolean) : null;
+  if (!cloudOk()) {
+    if (selected && selected.length) {
+      await AsyncStorage.setItem(PENDING_SYNC_GRADERS_KEY, JSON.stringify(selected)).catch(() => {});
+    }
+    toast('Offline — selected graders saved and will sync automatically when online.', 'amber');
+    return { synced: 0, queued: true };
+  }
+  const items = S.records
+    .filter((r) => needsSync(r) && (!selected || !selected.length || selected.includes(validateGraderName(r.grader).toLowerCase())))
+    .slice(0, limit);
+  if (!items.length) {
+    S.syncModal = null;
+    render();
+    toast('No pending records to sync.', 'ok');
+    return { synced: 0 };
+  }
+  S.syncModal = null;
+  S.syncing = { active: true, done: 0, total: items.length };
+  render();
+  let slowTimer = setTimeout(() => {
+    if (S.syncing.active) {
+      S.slowWifiModal = { open: true, done: S.syncing.done, total: S.syncing.total };
+      render();
+    }
+  }, 4000);
+  let okCount = 0;
+  for (const r of items) {
+    const ok = await uploadOne(r);
+    if (ok) okCount++;
+    S.syncing.done++;
+    if (S.slowWifiModal) S.slowWifiModal = { ...S.slowWifiModal, done: S.syncing.done, total: S.syncing.total };
+    render();
+  }
+  clearTimeout(slowTimer);
+  S.syncing.active = false;
+  S.slowWifiModal = null;
+  await AsyncStorage.removeItem(PENDING_SYNC_GRADERS_KEY).catch(() => {});
+  render();
+  toast(okCount === items.length ? `Synced ${okCount} record(s).` : `Synced ${okCount} of ${items.length} record(s).`, okCount === items.length ? 'ok' : 'amber');
+  return { synced: okCount };
+}
+
+function openWelcomeSyncModal() {
+  const groups = {};
+  for (const r of S.records) {
+    if (r.demo) continue;
+    const g = validateGraderName(r.grader) || 'Unassigned';
+    if (!groups[g]) groups[g] = { pending: 0, total: 0 };
+    groups[g].total++;
+    if (needsSync(r)) groups[g].pending++;
+  }
+  const sel = {};
+  Object.keys(groups).forEach((g) => { sel[g] = groups[g].pending > 0; });
+  S.syncModal = { open: true, groups, selected: sel };
+  render();
+}
 
 /* ---------- startup ---------- */
 async function runStartup() {
   const tok = uid(); S.startup = { tok, state: 'running', checks: [], fail: null }; S.screen = 'startup'; render();
   const f = S.demo.startupFault;
   let piOk = true;
-  try { await checkPiStatus(); } catch (e) { piOk = false; }
+  try { await checkPiStatus(S.piApiUrl); S.piStatus = 'connected'; } catch (e) { piOk = false; S.piStatus = 'error'; }
   const list = [
     ['Phone link', f === 'camera' ? { ok: false, msg: 'Phone link not responding' } : { ok: true, msg: 'Ready to pair' }],
-    ['Raspberry Pi', { ok: piOk, msg: piOk ? 'Connected' : 'Not reachable. Join TunaRpi Wi-Fi', soft: true, warn: !piOk }],
+    ['Raspberry Pi', { ok: piOk, msg: piOk ? `Connected (${S.piApiUrl})` : `Not reachable (${S.piApiUrl})`, soft: true, warn: !piOk }],
     ['Storage', { ok: true, msg: 'Writable' }],
     ['Shift', { ok: S.shift.open, msg: S.shift.open ? 'Open' : 'Closed', soft: true }],
     ['Printer', { ok: true, msg: 'Not confirmed in demo', soft: true, warn: true }],
@@ -295,9 +439,19 @@ async function runStartup() {
 function weightCheck(str) {
   if (!str) return { ok: false, msg: '' };
   const t = parseTenths(str);
-  if (t <= 0) return { ok: false, msg: 'Enter a weight greater than 0 kg.' };
+  if (t < 150) return { ok: false, msg: 'Enter a weight between 15.0 and 200.0 kg.' };
   if (t > 2000) return { ok: false, msg: "Above this site's maximum of 200.0 kg. Check the scale reading." };
   return { ok: true, t };
+}
+function setWeight(value) {
+  const s = S.session;
+  if (!s) return;
+  if (value === 'Clear') s.weightStr = '';
+  else if (value === 'Backspace') s.weightStr = s.weightStr.slice(0, -1);
+  else if (value === '.' && s.weightStr.includes('.')) return;
+  else if (/^[0-9.]$/.test(value)) s.weightStr = sanitizeWeight(s.weightStr + value);
+  else s.weightStr = sanitizeWeight(value);
+  render();
 }
 function sanitizeWeight(v) {
   v = String(v).replace(',', '.').replace(/[^0-9.]/g, '');
@@ -340,12 +494,129 @@ async function doUpload() {
   s.pending = { id: uid(), type: s.sampleType, ts: Date.now(), uri, source: 'upload' };
   go('review');
 }
+async function doPiSnapshot() {
+  if (S.busy || S.picking) return; const s = S.session; if (!s || !s.sampleType) return;
+  if (!S.shift.open) { toast('Shift is closed. Capture is blocked.', 'err'); return; }
+  S.busy = true; render();
+  const tok = s.id;
+  try {
+    const uri = await capturePiSnapshot(S.piApiUrl);
+    S.busy = false;
+    if (!S.session || S.session.id !== tok || S.screen !== 'camera') { render(); return; }
+    s.pending = { id: uid(), type: s.sampleType, ts: Date.now(), uri, source: 'pi-camera' };
+    go('review');
+  } catch (e) {
+    S.busy = false;
+    toast((e && e.message) || 'Could not capture from Raspberry Pi camera.', 'err');
+    render();
+  }
+}
 const piErrorText = (e) => {
   if (!e) return 'The Raspberry Pi could not grade the image.';
   if (e.message === 'timeout' || e.name === 'AbortError') return 'The Raspberry Pi took too long to answer.';
-  if (e.message === 'unreachable' || /network request failed/i.test(e.message || '')) return 'Cannot reach the Raspberry Pi. Check you are on the TunaRpi Wi-Fi.';
+  if (e.message === 'unreachable' || /network request failed/i.test(e.message || '')) return `Cannot reach the Raspberry Pi at ${S.piApiUrl}.`;
   return e.message || 'The Raspberry Pi could not grade the image.';
 };
+
+async function confirmGraderIdentity(typed) {
+  const clean = validateGraderName(typed);
+  if (!clean) return null;
+  const matches = findGraderMatches(clean, S.records);
+  if (matches.length) {
+    S.graderCheckModal = {
+      typed: clean,
+      match: matches[0],
+      addingInitial: false,
+      initialStr: '',
+      error: '',
+    };
+    render();
+    return null;
+  }
+  const s = S.session;
+  if (s) { s.grader = clean; S.lastGrader = clean; }
+  go('weight');
+  return clean;
+}
+
+function showPlacementTutorial(step = 1) {
+  S.tutorialStep = Math.max(1, Math.min(3, step));
+  go('tutorial');
+  if (S.tutorialStep < 3) {
+    S.timers.tut = setTimeout(() => {
+      if (S.screen === 'tutorial') showPlacementTutorial(S.tutorialStep + 1);
+    }, 2000);
+  }
+}
+
+function tailCutAvailabilityModal() {
+  const s = S.session;
+  if (!s) return;
+  s.tailPromptOpen = true;
+  render();
+}
+
+async function captureAndGrade(sampleType, fileUri) {
+  const s = S.session;
+  if (!s) return;
+  const typeKey = sampleType === 'Tail cut' || sampleType === 'tail' ? 'tail' : 'core';
+  s.sampleType = typeKey;
+  if (fileUri) {
+    s.pending = { id: uid(), type: typeKey, ts: Date.now(), uri: fileUri, source: 'file' };
+    return runAnalysis();
+  }
+  return doPiSnapshot();
+}
+
+function applyOverride(pin, grade, reason) {
+  const s = S.session;
+  if (!s) return false;
+  const cleanPin = String(pin || '').trim();
+  if (cleanPin !== '1234' && cleanPin !== '2468') {
+    S.ui.ovPinError = 'Invalid supervisor PIN (use 1234 or 2468).';
+    render();
+    return false;
+  }
+  const cleanReason = String(reason || '').trim();
+  const tg = s.captures.length > 1 ? S.ui.ovTarget : 'all';
+  if (!grade || !tg || cleanReason.length < 3) return false;
+  S.ui.ovPinError = '';
+  s.decisions = withOverride(s.decisions, grade, tg, {
+    reason: cleanReason,
+    actor: cleanPin === '2468' ? 'Expert supervisor' : 'Supervisor',
+    ts: Date.now(),
+    expectedRevision: 1,
+  });
+  persist(s);
+  const last = s.captures[s.captures.length - 1];
+  go(s.captures.length > 1 ? 'paired' : last.outcome === 'invalid' ? 'invalid' : 'result');
+  toast(tg === 'all' ? 'Grade set to ' + grade + ' by manual override.' : TYPES[tg].name + ' set to ' + grade + ' by manual override.');
+  return true;
+}
+
+function onSessionComplete() {
+  const s = S.session;
+  if (!s) return;
+  const r = persist(s);
+  r.closed = true;
+  enqueue(r);
+  recordPlacementSession(s.grader).catch(() => {});
+  go('completion');
+}
+
+function printOrSkipReceipt(action = 'print') {
+  if (action === 'skip') {
+    S.skipReceiptModal = true;
+    render();
+    return;
+  }
+  return doPrint();
+}
+
+function openRecordDetail(recordId) {
+  S.ui.histSel = recordId;
+  go('history');
+}
 
 async function runAnalysis() {
   const s = S.session; if (!s || !s.pending) return;
@@ -361,16 +632,39 @@ async function runAnalysis() {
     if (!PI_IMAGE_TYPE[p.type]) throw new Error(`Unsupported sample type: ${p.type}`);
     s.job.stage = 1;
     render();
-    res = await gradeWithPi(p.uri, PI_IMAGE_TYPE[p.type]);
+    res = await gradeWithPi(p.uri, PI_IMAGE_TYPE[p.type], S.piApiUrl);
   } catch (e) {
     if (!alive()) return;
+    const msg = piErrorText(e);
+    if (/wrong sample type|cannot be determined|422/i.test(msg)) {
+      s.pending = null;
+      s.job = null;
+      S.cannotDetermineModal = {
+        open: true,
+        sampleType: p.type,
+        message: `This image is not recognized as a valid ${TYPES[p.type].name}. Camera reset — please scan again.`,
+      };
+      go('camera');
+      return;
+    }
     s.job.state = 'error';
-    s.job.msg = piErrorText(e);
+    s.job.msg = msg;
     render();
     return;
   }
 
   if (!alive()) return;
+  if (res.invalid) {
+    s.pending = null;
+    s.job = null;
+    S.cannotDetermineModal = {
+      open: true,
+      sampleType: p.type,
+      message: `This image is not recognized as a valid ${TYPES[p.type].name}. Camera reset — please scan again.`,
+    };
+    go('camera');
+    return;
+  }
   s.job.stage = 2;
   render();
 
@@ -406,11 +700,15 @@ async function runAnalysis() {
   s.captures.push(cap);
   s.pending = null;
   s.job = null;
+  if (cap.type === 'core' && !res.invalid) {
+    const decision = resolve(s);
+    s.tailPromptOpen = Boolean(decision.tailNeeded);
+  } else {
+    s.tailPromptOpen = false;
+  }
   persist(s);
 
-  go(cap.outcome === 'accepted'
-    ? (s.captures.length >= 2 ? 'paired' : 'result')
-    : 'invalid');
+  go(screenAfterGrade(s));
 
   if (cap.outcome === 'invalid') toast('Invalid image', 'err');
 }
@@ -506,8 +804,8 @@ function saveReceiptToGallery() {
 }
 
 function startCountdown() {
-  S.countdown = 30; S.paused = false;
-  S.timers.cd = setInterval(() => { S.countdown--; if (S.countdown <= 0) { finishToWelcome(); return; } render(); }, 1000);
+  S.countdown = 3; S.paused = false;
+  S.timers.cd = setInterval(() => { S.countdown--; if (S.countdown <= 0) { act('another'); return; } render(); }, 1000);
 }
 function toast(msg, kind) { S.toast = { msg, kind }; render(); clearTimeout(S.timers.toast); S.timers.toast = setTimeout(() => { S.toast = null; render(); }, 2800); }
 function ask(title, body, acts) { S.dialog = { title, body, acts }; render(); }
@@ -515,7 +813,8 @@ function ask(title, body, acts) { S.dialog = { title, body, acts }; render(); }
 /* ---------- phone pairing: the phone scans the kiosk's QR code ---------- */
 // The kiosk shows a QR such as  tunaeye://pair?k=KIOSK-01  (or https://kiosk.tunaeye.example/pair?k=KIOSK-01)
 
-const DEFAULT_PI_API = 'http://10.42.0.1:5000';
+const DEFAULT_PI_API = PI_CONFIG.apiUrl;
+const PI_URL_STORAGE_KEY = '@tunaeye/pi_api_url';
 
 let pairingInProgress = false;
 
@@ -530,22 +829,30 @@ function parseKioskCode(data) {
 
     if (
       qr &&
-      typeof qr.ssid === 'string' &&
-      typeof qr.apiUrl === 'string'
+      typeof qr.apiUrl === 'string' &&
+      /^https?:\/\//i.test(qr.apiUrl.trim())
     ) {
-      const apiUrl = qr.apiUrl.replace(/\/+$/, '');
-
-      if (apiUrl !== DEFAULT_PI_API) return null;
+      const apiUrl = normalizePiUrl(qr.apiUrl);
 
       return {
         kioskId: qr.kioskId || 'KIOSK-01',
-        ssid: qr.ssid,
+        ssid: qr.ssid || 'TunaRpi',
         apiUrl,
         streamUrl: qr.streamUrl || null,
       };
     }
   } catch {
-    // Try legacy pairing URL
+    // Try legacy pairing URL or direct URL
+  }
+
+  // Support direct HTTP/HTTPS URL QR code
+  if (/^https?:\/\//i.test(str)) {
+    return {
+      kioskId: 'KIOSK-01',
+      ssid: 'TunaRpi',
+      apiUrl: normalizePiUrl(str),
+      streamUrl: null,
+    };
   }
 
   // Support old TunaEye QR format
@@ -558,7 +865,7 @@ function parseKioskCode(data) {
     return {
       kioskId: m[1],
       ssid: 'TunaRpi',
-      apiUrl: DEFAULT_PI_API,
+      apiUrl: S.piApiUrl || DEFAULT_PI_API,
       streamUrl: null,
     };
   }
@@ -567,40 +874,11 @@ function parseKioskCode(data) {
 }
 
 async function verifyKioskConnection(config) {
-  const controller = new AbortController();
-
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, 6000);
-
-  try {
-    const response = await fetch(
-      `${config.apiUrl}/status`,
-      {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          Accept: 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Raspberry Pi returned HTTP ${response.status}`
-      );
-    }
-
-    const status = await response.json();
-
-    if (!status || typeof status !== 'object') {
-      throw new Error('Invalid Raspberry Pi response');
-    }
-
-    return status;
-  } finally {
-    clearTimeout(timeout);
+  const status = await checkPiStatus(config.apiUrl || S.piApiUrl || DEFAULT_PI_API, 1);
+  if (!status || typeof status !== 'object') {
+    throw new Error('Invalid Raspberry Pi response');
   }
+  return status;
 }
 
 function connectPhone(config) {
@@ -608,14 +886,20 @@ function connectPhone(config) {
 
   if (!s) return;
 
+  const cfg = typeof config === 'string'
+    ? { kioskId: config, apiUrl: S.piApiUrl || DEFAULT_PI_API, streamUrl: null }
+    : (config || {});
+
   s.phone = 'connected';
 
   S.phoneLinked = true;
-  S.kioskId = config.kioskId || 'KIOSK-01';
-  S.piApiUrl = config.apiUrl || DEFAULT_PI_API;
-  S.piStreamUrl = config.streamUrl || null;
+  S.kioskId = cfg.kioskId || 'KIOSK-01';
+  S.piApiUrl = normalizePiUrl(cfg.apiUrl) || S.piApiUrl || DEFAULT_PI_API;
+  S.piUrlDraft = S.piApiUrl;
+  S.piStreamUrl = cfg.streamUrl || null;
   S.piStatus = 'connected';
   S.scanError = '';
+  AsyncStorage.setItem(PI_URL_STORAGE_KEY, S.piApiUrl).catch(() => { });
 
   render();
 }
@@ -669,14 +953,14 @@ async function pairWithKiosk(data) {
   }
 }
 
-let askCamera = () => {};
+let askCamera = () => { };
 let camRef = null;
 
 
 async function checkRaspberryPi() {
   S.piStatus = 'connecting'; render();
   try {
-    await checkPiStatus();
+    await checkPiStatus(S.piApiUrl);
     S.piStatus = 'connected';
   } catch (e) {
     console.log('Pi connection failed:', e);
@@ -690,7 +974,7 @@ async function checkRaspberryPi() {
 const A = {
   retryStartup() { runStartup(); },
   checkPi() { checkRaspberryPi(); },
-  start() { if (!S.shift.open) return; newSession(); go('weight'); },
+  start() { if (!S.shift.open) return; newSession(); go('grader'); },
   openShift() { S.shift = { open: true, since: Date.now(), operator: 'Operator 01 (Demo)' }; render(); },
   closeShift() { ask('Close the shift?', 'Grading will be blocked until a shift is opened again. Saved results are kept.', [{ label: 'Keep open', act: 'closeDialog' }, { label: 'Close shift', act: 'doCloseShift', kind: 'danger' }]); },
   doCloseShift() { S.shift.open = false; S.dialog = null; render(); },
@@ -698,13 +982,44 @@ const A = {
   closeHelp() { S.help = false; render(); },
   help() { S.help = true; render(); },
   go(a) { S.dialog = null; go(a); },
-  goSync() { go('sync'); },
-  pairNext() { const s = S.session; if (s.phone !== 'connected') return; go('align'); },
-  simPhone() { connectPhone('KIOSK-01'); },
-  skipDemo() { connectPhone('KIOSK-01'); },
+  goSync() { openWelcomeSyncModal(); },
+  pairNext() { const s = S.session; if (s.phone !== 'connected') return; go('camera'); },
+  simPhone() { connectPhone({ kioskId: 'KIOSK-01', apiUrl: S.piApiUrl || DEFAULT_PI_API }); },
+  skipDemo() { connectPhone({ kioskId: 'KIOSK-01', apiUrl: S.piApiUrl || DEFAULT_PI_API }); },
+  setPiUrlDraft(v) { S.piUrlDraft = v; render(); },
+  async connectPiUrl() {
+    const url = normalizePiUrl(S.piUrlDraft || S.piApiUrl || DEFAULT_PI_API);
+    if (!/^https?:\/\//i.test(url)) {
+      S.scanError = 'Enter a valid http:// or https:// Raspberry Pi URL.';
+      render();
+      return;
+    }
+    S.piStatus = 'connecting';
+    S.scanError = '';
+    render();
+    try {
+      await verifyKioskConnection({ apiUrl: url });
+      connectPhone({ kioskId: 'KIOSK-01', ssid: 'TunaRpi', apiUrl: url, streamUrl: null });
+    } catch (error) {
+      S.phoneLinked = false;
+      S.piStatus = 'error';
+      if (S.session) S.session.phone = 'waiting';
+      S.scanError = `Cannot reach Raspberry Pi at ${url}.`;
+      render();
+    }
+  },
+  async savePiUrl() {
+    const url = normalizePiUrl(S.piUrlDraft);
+    if (!/^https?:\/\//i.test(url)) { toast('Enter a valid http:// or https:// URL.', 'err'); return; }
+    S.piApiUrl = url;
+    S.piUrlDraft = url;
+    AsyncStorage.setItem(PI_URL_STORAGE_KEY, url).catch(() => { });
+    await checkRaspberryPi();
+    toast(S.piStatus === 'connected' ? `Connected to ${url}` : `Saved ${url}, but Raspberry Pi is not reachable.`, S.piStatus === 'connected' ? 'ok' : 'err');
+  },
   repair() { const s = S.session; S.phoneLinked = false; s.phone = 'waiting'; S.scanError = ''; render(); },
   allowCamera() { askCamera(); },
-  openSettings() { Linking.openSettings().catch(() => {}); },
+  openSettings() { Linking.openSettings().catch(() => { }); },
   onbNext() { if (S.onbStep < ONB.length - 1) { S.onbStep++; render(); } else A.onbDone(); },
   onbBack() { if (S.onbStep > 0) { S.onbStep--; render(); } },
   onbSkip() { A.onbDone(); },
@@ -717,41 +1032,152 @@ const A = {
   goHistory() { S.ui.histSel = null; go('history'); },
   openHist(id) { S.ui.histSel = id; render(); },
   closeHist() { S.ui.histSel = null; render(); },
-   weightNext() {
+  async weightNext() {
     const s = S.session, c = weightCheck(s.weightStr); if (!c.ok) return;
     if (s.editingWeight) {
       s.weightTenths = c.t; s.weightCorrections++; s.editingWeight = false; persist(s);
       go(s.editFrom || 'price'); return;
     }
-    s.weightTenths = c.t; go('grader');
+    s.weightTenths = c.t;
+    s.sampleType = 'core';
+    s.sampleTypes = ['core'];
+    const skipTut = await shouldSkipPlacementTutorial(s.grader);
+    if (!skipTut) {
+      showPlacementTutorial(1);
+    } else {
+      go(s.phone === 'connected' ? 'camera' : 'pair');
+    }
   },
   graderNext() {
-    const s = S.session; if (s.grader.trim().length < 2) return;
-    s.grader = s.grader.trim(); S.lastGrader = s.grader;
-    go('sample');
+    const s = S.session;
+    const clean = validateGraderName(s.grader);
+    if (clean.length < 1) return;
+    confirmGraderIdentity(clean);
   },
+  tutNext() {
+    if (S.tutorialStep < 3) showPlacementTutorial(S.tutorialStep + 1);
+    else { const s = S.session; go(s && s.phone === 'connected' ? 'camera' : 'pair'); }
+  },
+  tutClose() {
+    clearTimeout(S.timers.tut);
+    const s = S.session;
+    go(s && s.phone === 'connected' ? 'camera' : 'pair');
+  },
+  dismissCannotDetermine() {
+    S.cannotDetermineModal = null;
+    render();
+  },
+  syncToggleGrader(g) {
+    if (!S.syncModal) return;
+    S.syncModal.selected[g] = !S.syncModal.selected[g];
+    render();
+  },
+  syncToggleAll() {
+    if (!S.syncModal) return;
+    const keys = Object.keys(S.syncModal.groups);
+    const allOn = keys.every((k) => S.syncModal.selected[k]);
+    keys.forEach((k) => { S.syncModal.selected[k] = !allOn; });
+    render();
+  },
+  syncStartSelected() {
+    if (!S.syncModal) return;
+    const graders = Object.keys(S.syncModal.selected).filter((k) => S.syncModal.selected[k]);
+    syncPendingRecords({ limit: 200, graders });
+  },
+  syncModalClose() { S.syncModal = null; render(); },
+  slowWifiBg() { S.slowWifiModal = null; render(); },
+  graderMatchYes() {
+    const m = S.graderCheckModal?.match;
+    const s = S.session;
+    if (m && s) { s.grader = m.name; S.lastGrader = m.name; }
+    S.graderCheckModal = null;
+    go('weight');
+  },
+  graderMatchNo() {
+    if (!S.graderCheckModal) return;
+    S.graderCheckModal.addingInitial = true;
+    S.graderCheckModal.error = '';
+    render();
+  },
+  graderInitialKey(k) {
+    const m = S.graderCheckModal;
+    if (!m) return;
+    if (k === 'del') m.initialStr = m.initialStr.slice(0, -1);
+    else if (m.initialStr.length < 4) m.initialStr += k;
+    m.error = '';
+    render();
+  },
+  graderInitialConfirm() {
+    const m = S.graderCheckModal;
+    const s = S.session;
+    if (!m || !s || !m.initialStr.length) return;
+    const candidate = validateGraderName(`${m.typed} ${m.initialStr}.`);
+    const dup = S.records.some((r) => validateGraderName(r.grader).toLowerCase() === candidate.toLowerCase());
+    if (dup) {
+      m.error = `"${candidate}" already exists — add 1 more letter or number`;
+      render();
+      return;
+    }
+    s.grader = candidate;
+    S.lastGrader = candidate;
+    S.graderCheckModal = null;
+    go('weight');
+  },
+  graderCheckCancel() { S.graderCheckModal = null; render(); },
   cancelSession() {
     const s = S.session; const has = s && s.captures.length;
     ask('Cancel this session?', has ? 'Saved results stay on this device for review. The weight and any unsaved image are cleared.' : 'The weight and anything entered on this screen will be cleared.', [{ label: 'Keep grading', act: 'closeDialog' }, { label: 'Cancel session', act: 'abandon', kind: 'danger' }]);
   },
   abandon() { abandonSession(); },
-    sampleBack() { const s = S.session; go(s.captures.length ? 'result' : 'grader'); },
+  sampleBack() { const s = S.session; go(s.captures.length ? 'result' : 'grader'); },
   pick(t) {
     const s = S.session;
     if (s.captures.some((c) => c.type === t)) return;
-    const on = s.sampleTypes.includes(t);
-    s.sampleTypes = on ? s.sampleTypes.filter((x) => x !== t) : [...s.sampleTypes, t];
-    s.sampleType = s.sampleTypes[0] || null;
+    if (t === 'core') {
+      if (!s.sampleTypes.includes('core')) s.sampleTypes = ['core', ...s.sampleTypes];
+      s.sampleType = 'core';
+      render();
+      return;
+    }
+    const hasTail = s.sampleTypes.includes('tail');
+    s.sampleTypes = hasTail ? ['core'] : ['core', 'tail'];
+    s.sampleType = s.captures.some((c) => c.type === 'core') ? 'tail' : 'core';
     render();
   },
   sampleNext() {
     const s = S.session;
-    if (!s.sampleTypes.length) return;
-    const next = s.sampleTypes.find((t) => !s.captures.some((c) => c.type === t)) || s.sampleTypes[0];
+    if (!s.sampleTypes.length) s.sampleTypes = ['core'];
+    const ordered = ['core', 'tail'].filter((t) => s.sampleTypes.includes(t));
+    const next = ordered.find((t) => !s.captures.some((c) => c.type === t)) || ordered[0];
     s.sampleType = next;
-    go('pair');
+    go(s.phone === 'connected' ? 'align' : 'pair');
+  },
+  captureTail() {
+    const s = S.session;
+    if (!s) return;
+    s.tailAvailability = 'available';
+    s.tailPromptOpen = false;
+    if (!s.sampleTypes.includes('tail')) s.sampleTypes = ['core', 'tail'];
+    s.sampleType = 'tail';
+    persist(s);
+    go(s.phone === 'connected' ? 'camera' : 'pair');
+  },
+  tailNotAvailable() {
+    const s = S.session;
+    if (!s) return;
+    s.tailAvailability = 'not_available';
+    s.tailPromptOpen = false;
+    persist(s);
+    render();
+  },
+  openTailPrompt() {
+    const s = S.session;
+    if (!s) return;
+    s.tailPromptOpen = true;
+    render();
   },
   capture() { doCapture(); },
+  capturePi() { doPiSnapshot(); },
   uploadImage() { doUpload(); },
   retake() { const s = S.session; s.pending = null; s.job = null; go('camera'); },
   useImage() { runAnalysis(); },
@@ -774,15 +1200,29 @@ const A = {
     r.quote = { grade: p.grade, rateC: p.rate, weightTenths: s.weightTenths, totalC: p.total, scheduleVersion: S.schedule.version, scheduleId: S.schedule.id, revision: 1, confirmedAt: Date.now(), rounding: 'half-up to centavo' };
     r.closed = true; s.quote = r.quote; enqueue(r); S.print = null; S.receiptSaved = false; S.receiptCaptureRef = null; go('receipt');
   },
-  print() { doPrint(); },
+  print() { printOrSkipReceipt('print'); },
+  skipReceipt() { printOrSkipReceipt('skip'); },
+  confirmSkipReceipt() { S.skipReceiptModal = false; onSessionComplete(); },
+  cancelSkipReceipt() { S.skipReceiptModal = false; render(); },
+  doneReceipt() { onSessionComplete(); },
   saveGallery() { saveReceiptToGallery(); },
   stay() { clearInterval(S.timers.cd); S.paused = true; render(); },
   finish() { finishToWelcome(); },
-  another() { clearPublicSession(); S.auth = null; newSession(); go('weight'); },
+  another() {
+    const keepGrader = S.session?.grader || S.lastGrader || '';
+    clearPublicSession();
+    S.auth = null;
+    newSession();
+    if (S.session) S.session.grader = keepGrader;
+    go('weight');
+  },
+  histScope(sc) { S.ui.histScope = sc; S.ui.histPage = 0; render(); },
+  histPrev() { if (S.ui.histPage > 0) { S.ui.histPage--; render(); } },
+  histNext() { S.ui.histPage++; render(); },
 
   /* ----- manual override ----- */
   override() {
-    const s = S.session; S.ui.ovGrade = null; S.ui.ovReason = ''; S.ui.ovAck = false;
+    const s = S.session; S.ui.ovGrade = null; S.ui.ovReason = ''; S.ui.ovAck = false; S.ui.ovPin = ''; S.ui.ovPinError = '';
     // With two samples the grader picks which one to override (pre-select a sample that is not accepted).
     const bad = s.captures.find((c) => c.outcome !== 'accepted');
     S.ui.ovTarget = s.captures.length > 1 ? (bad ? bad.type : null) : 'all';
@@ -794,14 +1234,7 @@ const A = {
   ovAck() { S.ui.ovAck = !S.ui.ovAck; render(); },
   cancelOverride() { go(S.session.ovFrom || 'result'); },
   applyOverride() {
-    const s = S.session, g = S.ui.ovGrade, reason = S.ui.ovReason.trim();
-    const tg = s.captures.length > 1 ? S.ui.ovTarget : 'all';
-    if (!g || !tg || reason.length < 5 || !S.ui.ovAck) return;
-    s.decisions = withOverride(s.decisions, g, tg, { reason, actor: s.grader || 'Grader', ts: Date.now(), expectedRevision: 1 });
-    persist(s);
-    const last = s.captures[s.captures.length - 1];
-    go(s.captures.length > 1 ? 'paired' : last.outcome === 'accepted' ? 'result' : 'price');
-    toast(tg === 'all' ? 'Grade set to ' + g + ' by manual override.' : TYPES[tg].name + ' set to ' + g + ' by manual override.');
+    applyOverride(S.ui.ovPin, S.ui.ovGrade, S.ui.ovReason);
   },
   clearOverride() {
     const s = S.session; s.decisions = s.decisions.filter((d) => !d.manual); persist(s);
@@ -891,7 +1324,7 @@ function Icon({ n, s = 28, c = C.navy, w = 2.2 }) {
       <G fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round">
         {(IC[n] || []).map((e, i) => e[0] === 'p' ? <Path key={i} d={e[1]} />
           : e[0] === 'c' ? <Circle key={i} cx={e[1]} cy={e[2]} r={e[3]} />
-          : <Rect key={i} x={e[1]} y={e[2]} width={e[3]} height={e[4]} rx={e[5]} />)}
+            : <Rect key={i} x={e[1]} y={e[2]} width={e[3]} height={e[4]} rx={e[5]} />)}
       </G>
     </Svg>
   );
@@ -1030,7 +1463,7 @@ function Stat({ v, l, k }) {
 function Card({ lift, style, children }) {
   return (
     <View style={[{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 28, padding: 18 },
-      lift && { shadowColor: C.navy, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 3 }, style]}>{children}</View>
+    lift && { shadowColor: C.navy, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 3 }, style]}>{children}</View>
   );
 }
 function KV({ l, r, last, center }) {
@@ -1068,10 +1501,12 @@ function Btn({ label, act: a, arg, kind = '', dis = false, icon, style, bar }) {
       disabled={dis} onPress={() => act(a, arg)}
       accessibilityRole="button" accessibilityLabel={label || icon} accessibilityState={{ disabled: dis }}
       style={({ pressed }) => [
-        { minHeight: primary ? 62 : small ? 46 : 52, paddingHorizontal: 22, borderRadius: 999, borderWidth: ghost ? 0 : 2,
+        {
+          minHeight: primary ? 62 : small ? 46 : 52, paddingHorizontal: 22, borderRadius: 999, borderWidth: ghost ? 0 : 2,
           borderColor: primary ? C.primary : danger ? '#E9BDBD' : C.border,
           backgroundColor: primary ? C.primary : ghost ? 'transparent' : C.surface,
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10
+        },
         primary && !dis && { shadowColor: C.primary, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
         bar && (primary ? { flexBasis: '100%' } : ghost ? { paddingHorizontal: 12 } : { flexGrow: 1, flexBasis: '40%' }),
         dis && (primary ? { backgroundColor: '#9DB9F5', borderColor: '#9DB9F5', shadowOpacity: 0 } : { opacity: 0.4 }),
@@ -1348,44 +1783,40 @@ screens.startup = () => {
   );
 };
 
-screens.welcome = () => {
-
+function renderWelcome() {
   const c = counts();
   const pend = c.pending + c.failed + c.syncing;
   const open = S.shift.open;
-
   const dayKey = (t) => manila(t).toISOString().slice(0, 10);
-
-  const todayN = S.records.filter(
-    (r) => dayKey(r.createdAt) === dayKey(Date.now())
-  ).length;
-
+  const todayN = S.records.filter((r) => dayKey(r.createdAt) === dayKey(Date.now())).length;
   const hr = manila(Date.now()).getUTCHours();
-
-  const greet =
-    hr < 12 ? 'Good morning' :
-    hr < 18 ? 'Good afternoon' :
-    'Good evening';
-
+  const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
   const name = (S.lastGrader || '').trim().split(' ')[0];
-
   const dot = S.net === 'online' ? '#5BE3A3' : '#FFC94D';
-  
+  const sm = S.syncModal;
+  const sw = S.slowWifiModal;
+
   return (
     <Hero>
       <View style={{ flex: 1, paddingHorizontal: 22, paddingTop: 14 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Logo s={30} light />
-          {/* tap to open the demo controls */}
           <Pressable onPress={() => { S.drawer = !S.drawer; render(); }} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 34, paddingHorizontal: 12, borderRadius: 17, backgroundColor: C.heroSoft }}>
             <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: dot }} />
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{open ? 'Shift open' : 'Shift closed'}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{open ? 'TunaEye Station 01 · Ready' : 'Shift closed'}</Text>
           </Pressable>
         </View>
-        <Text style={{ marginTop: 22, fontSize: 34 * TS(), lineHeight: 38 * TS(), fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>{name ? `${greet},\n${name}` : `${greet}!`}</Text>
-        <Text style={{ marginTop: 8, fontSize: 16 * TS(), lineHeight: 22 * TS(), color: 'rgba(255,255,255,0.88)' }}>Grade a tuna sample in about a minute. Have the fish weight ready.</Text>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 150 }}>
-          <View style={{ transform: [{ rotate: '-4deg' }] }}><ChamberLine w={Math.min(250, 250)} /></View>
+        <Text style={{ marginTop: 18, fontSize: 32 * TS(), lineHeight: 36 * TS(), fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>{name ? `${greet},\n${name}` : `${greet}!`}</Text>
+        <Text style={{ marginTop: 6, fontSize: 15 * TS(), lineHeight: 20 * TS(), color: 'rgba(255,255,255,0.88)' }}>Grade yellowfin tuna: Sashibo core first, Tail-Cut if needed.</Text>
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+          {['01 Grader & Weight', '02 Core', '03 Tail (if needed)', '04 Receipt'].map((step) => (
+            <View key={step} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)' }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#fff' }}>{step}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
+          <View style={{ transform: [{ rotate: '-4deg' }] }}><ChamberLine w={220} /></View>
         </View>
       </View>
       <View style={sheetStyle}>
@@ -1400,59 +1831,104 @@ screens.welcome = () => {
             {B('Open shift', 'openShift', '', 'primary', false, '', { width: '100%' })}
           </View>
         )}
-         {/* NEW: History gets its own button */}
-        {B('History', 'goHistory', '', '', false, 'list', { width: '100%' })}
+        {B('Grader Dashboard', 'goHistory', '', '', false, 'list', { width: '100%' })}
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           {B('How it works', 'showOnboarding', '', 'ghost', false, 'info')}
           {B(pend ? `Sync (${pend})` : 'Sync', 'goSync', '', 'ghost', false, 'refresh')}
         </View>
       </View>
+
+      {sm && sm.open ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.48)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 60 }}>
+          <Card lift style={{ width: '100%', maxWidth: 420, gap: 12, padding: 20, borderRadius: 24 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Txt k="h1" style={{ fontSize: 20 }}>Sync pending records</Txt>
+              {B('Toggle all', 'syncToggleAll', '', 'small ghost')}
+            </View>
+            <Txt k="sub">Select graders to upload to shared Supabase:</Txt>
+            <ScrollView style={{ maxHeight: 220 }}>
+              <View style={{ gap: 8 }}>
+                {Object.keys(sm.groups).length ? Object.keys(sm.groups).map((g) => {
+                  const info = sm.groups[g], on = !!sm.selected[g];
+                  return (
+                    <Pressable key={g} onPress={() => act('syncToggleGrader', g)}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: on ? C.primary : C.border, backgroundColor: on ? '#EEF4FF' : C.surface }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: on ? C.primary : C.border, backgroundColor: on ? C.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                          {on ? <Icon n="check" s={14} c="#fff" w={3} /> : null}
+                        </View>
+                        <Text style={{ fontWeight: '700', color: C.navy, fontSize: 15 }}>{g}</Text>
+                      </View>
+                      <Text style={{ color: C.text2, fontSize: 13 }}>{`${info.pending} pending · ${info.total} total`}</Text>
+                    </Pressable>
+                  );
+                }) : <Txt k="det">No local records on this device yet.</Txt>}
+              </View>
+            </ScrollView>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {B('Close', 'syncModalClose', '', '', false, '', { flex: 1 })}
+              {B('Sync selected', 'syncStartSelected', '', 'primary', !Object.values(sm.selected).some(Boolean), 'refresh', { flex: 1 })}
+            </View>
+          </Card>
+        </View>
+      ) : null}
+
+      {sw && sw.open ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.48)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 70 }}>
+          <Card lift style={{ width: '100%', maxWidth: 400, gap: 14, padding: 22, borderRadius: 24, alignItems: 'center' }}>
+            <Spin />
+            <Txt k="h1" style={{ fontSize: 20, textAlign: 'center' }}>Slow Wi-Fi connection</Txt>
+            <Txt k="sub" style={{ textAlign: 'center' }}>{`Syncing ${Math.min(sw.done + 1, sw.total)}/${sw.total}…`}</Txt>
+            <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+              {B('Sync in background', 'slowWifiBg', '', '', false, '', { flex: 1 })}
+              {B('Keep waiting', 'slowWifiBg', '', 'primary', false, '', { flex: 1 })}
+            </View>
+          </Card>
+        </View>
+      ) : null}
     </Hero>
   );
-};
+}
+screens.welcome = () => renderWelcome();
 
 screens.weight = () => {
   const s = S.session, chk = weightCheck(s.weightStr), editing = s.editingWeight, ts = TS();
-  const selected = s.sampleTypes.length ? s.sampleTypes.map((t) => TYPES[t].name).join(' + ') : 'Not selected yet';
+  const keys = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['.', '0', 'Backspace']];
   return (
-    <Shell idx={1} left={[backBtn(editing ? 'go' : 'cancelSession', editing ? (s.editFrom || 'price') : ''), helpBtn()]}
-      right={[B(editing ? 'Update price' : 'Continue', 'weightNext', '', 'primary', !chk.ok, 'arrow')]}>
-      <View style={[BODY, { gap: 22, paddingTop: 20, paddingBottom: 36 }]}>
-        <View style={{ alignItems: 'center', paddingBottom: 4 }}>
-          <Txt k="title" style={{ fontSize: 34, lineHeight: 40, textAlign: 'center' }}>Fish details</Txt>
+    <Shell idx={1} left={[backBtn(editing ? 'go' : 'grader', editing ? (s.editFrom || 'price') : ''), helpBtn()]}
+      right={[B(editing ? 'Update price' : 'Start capture', 'weightNext', '', 'primary', !chk.ok, 'arrow')]}>
+      <View style={[BODY, { gap: 14, paddingTop: 12, paddingBottom: 20 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {chip(`Order ${s.recordId}`, 'info')}
+          {chip(`Grader: ${s.grader || '—'}`, 'ok', 'check')}
         </View>
+        <Txt k="title" style={{ fontSize: 30, textAlign: 'center' }}>Weight entry</Txt>
 
-        <Card lift style={{ gap: 14, paddingVertical: 22, paddingHorizontal: 20 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 4 }}>
-            <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#E4ECFC', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon n="pulse" s={24} c={C.primary} />
-            </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Txt k="h2">Fish details</Txt>
-              <Txt k="sub">Information attached to this grading record.</Txt>
-            </View>
+        <Card lift style={{ gap: 12, paddingVertical: 18, paddingHorizontal: 18 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Txt k="label">Fish weight (15–200 kg)</Txt>
+            {B('Clear', 'clearWeight', '', 'small ghost')}
           </View>
-          <View>
-            <KV l="Weight" r={chk.ok ? fmtKg(chk.t) : 'Enter weight below'} />
-            <KV l="Record" r={s.recordId} />
-            <KV l="Species" r="Yellowfin tuna" />
-            <KV l="Selected sample" r={selected} last />
+          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: chk.msg ? C.err : C.primary, borderRadius: 20, paddingHorizontal: 18, minHeight: 74 }}>
+            <TextInput
+              style={{ flex: 1, fontSize: 44 * ts, fontWeight: '800', color: C.navy, paddingVertical: 0 }}
+              value={s.weightStr} onChangeText={(v) => setWeight(v)}
+              keyboardType="decimal-pad" placeholder="0.0" placeholderTextColor="#AAB8C8" maxLength={5} selectTextOnFocus
+            />
+            <Text style={{ fontSize: 20, fontWeight: '700', color: C.text2 }}>kg</Text>
           </View>
-          <View style={{ gap: 10, marginTop: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Txt k="label">Fish weight</Txt>
-              <Txt k="det" style={{ color: C.primary, fontWeight: '700' }}>Required</Txt>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: chk.msg ? C.err : C.primary, borderRadius: 22, paddingHorizontal: 18, minHeight: 86 }}>
-              <TextInput
-                style={{ flex: 1, fontSize: 52 * ts, fontWeight: '800', color: C.navy, paddingVertical: 0 }}
-                value={s.weightStr} onChangeText={(v) => { s.weightStr = sanitizeWeight(v); render(); }}
-                keyboardType="decimal-pad" placeholder="0.0" placeholderTextColor="#AAB8C8" maxLength={5} selectTextOnFocus
-              />
-              <Text style={{ fontSize: 22, fontWeight: '700', color: C.text2 }}>kg</Text>
-            </View>
-            {chk.msg ? <Text style={{ color: C.err, fontSize: 13 }}>{chk.msg}</Text> : <Txt k="det">Example: 4.7 for four and seven tenths kilograms.</Txt>}
+          {chk.msg ? <Text style={{ color: C.err, fontSize: 13 }}>{chk.msg}</Text> : <Txt k="det">Enter 15.0 to 200.0 kg (1 decimal place allowed).</Txt>}
+          <View style={{ gap: 8, marginTop: 4 }}>
+            {keys.map((row, idx) => (
+              <View key={idx} style={{ flexDirection: 'row', gap: 8 }}>
+                {row.map((k) => (
+                  <Pressable key={k} onPress={() => setWeight(k)} style={({ pressed }) => [st.key, { minHeight: 50 }, pressed && { backgroundColor: '#EEF4FF' }]}>
+                    <Text style={[st.keyText, { fontSize: k === 'Backspace' ? 18 : 24 }]}>{k === 'Backspace' ? '⌫' : k}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
           </View>
         </Card>
       </View>
@@ -1462,12 +1938,14 @@ screens.weight = () => {
 
 screens.grader = () => {
   const s = S.session, ts = TS();
+  const gm = S.graderCheckModal;
+  const initials = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '2', '3', '4'];
   return (
-    <Shell idx={1} left={[backBtn('go', 'weight'), helpBtn()]}
-      right={[B('Continue', 'graderNext', '', 'primary', s.grader.trim().length < 2, 'arrow')]}>
-      <View style={[BODY, { gap: 22, paddingTop: 20, paddingBottom: 36 }]}>
+    <Shell idx={1} left={[backBtn('cancelSession'), helpBtn()]}
+      right={[B('Continue', 'graderNext', '', 'primary', validateGraderName(s.grader).length < 1, 'arrow')]}>
+      <View style={[BODY, { gap: 18, paddingTop: 16, paddingBottom: 32 }]}>
         <View style={{ alignItems: 'center', paddingBottom: 4 }}>
-          <Txt k="title" style={{ fontSize: 34, lineHeight: 40, textAlign: 'center' }}>Grader details</Txt>
+          <Txt k="title" style={{ fontSize: 32, lineHeight: 38, textAlign: 'center' }}>Grader identity</Txt>
         </View>
 
         <Card lift style={{ gap: 16, paddingVertical: 22, paddingHorizontal: 20, borderColor: '#C9D9F7', backgroundColor: '#F8FBFF' }}>
@@ -1476,48 +1954,108 @@ screens.grader = () => {
               <Icon n="edit" s={27} c="#fff" />
             </View>
             <View style={{ flex: 1, gap: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Txt k="label">GRADER</Txt>
-                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#E8F0FF' }}><Text style={{ fontSize: 11, fontWeight: '800', color: C.primary }}>REQUIRED</Text></View>
-              </View>
-              <Text style={{ fontSize: 28 * ts, lineHeight: 34 * ts, fontWeight: '800', color: C.navy }}>Grader name</Text>
-              <Txt k="sub">This name will appear on the saved record and receipt.</Txt>
+              <Txt k="label">GRADER NAME (MAX 15 CHARS)</Txt>
+              <Text style={{ fontSize: 24 * ts, fontWeight: '800', color: C.navy }}>Who is grading?</Text>
+              <Txt k="sub">Your records and dashboard filter by this name.</Txt>
             </View>
           </View>
           <TextInput
             style={[st.field, { minHeight: 64, borderRadius: 20, fontSize: 22 * ts, fontWeight: '700', paddingHorizontal: 20, borderColor: C.primary, backgroundColor: '#fff' }]}
-            value={s.grader} onChangeText={(v) => { s.grader = v; render(); }}
-            placeholder="Enter grader's full name" placeholderTextColor="#8A99AB"
-            autoCapitalize="words" autoCorrect={false} maxLength={40} returnKeyType="done"
+            value={s.grader} onChangeText={(v) => { s.grader = v.slice(0, 15); render(); }}
+            placeholder="Enter your name" placeholderTextColor="#8A99AB"
+            autoCapitalize="words" autoCorrect={false} maxLength={15} returnKeyType="done"
           />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {chip('Role: Fish grader', 'info', 'check')}
-            {chip('Session operator', 'ok')}
+            {chip('1–15 characters', 'info', 'check')}
+            {chip('Phonetic match check', 'ok')}
           </View>
+        </Card>
+      </View>
+
+      {gm ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.48)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 60 }}>
+          <Card lift style={{ width: '100%', maxWidth: 430, gap: 14, padding: 20, borderRadius: 24 }}>
+            <Txt k="h1" style={{ fontSize: 22 }}>{`Are you ${gm.match.name}?`}</Txt>
+            <Txt k="sub">{`Have you graded ${gm.match.ago}?`}</Txt>
+            {!gm.addingInitial ? (
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {B('No, start new', 'graderMatchNo', '', '', false, '', { flex: 1 })}
+                {B('Yes, continue', 'graderMatchYes', '', 'primary', false, 'check', { flex: 1 })}
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                <Txt k="label">{`Add 1–4 last-initial characters for "${gm.typed} ${gm.initialStr || '_'}"`}</Txt>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {initials.map((ch) => (
+                    <Pressable key={ch} onPress={() => act('graderInitialKey', ch)} style={{ width: 34, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.canvas, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontWeight: '700', color: C.navy }}>{ch}</Text>
+                    </Pressable>
+                  ))}
+                  <Pressable onPress={() => act('graderInitialKey', 'del')} style={{ width: 46, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.warnbg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontWeight: '700', color: C.navy }}>⌫</Text>
+                  </Pressable>
+                </View>
+                {gm.error ? <Text style={{ color: C.err, fontSize: 13 }}>{gm.error}</Text> : null}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  {B('Cancel', 'graderCheckCancel', '', '', false, '', { flex: 1 })}
+                  {B('Continue', 'graderInitialConfirm', '', 'primary', !gm.initialStr.length, 'arrow', { flex: 1 })}
+                </View>
+              </View>
+            )}
+          </Card>
+        </View>
+      ) : null}
+    </Shell>
+  );
+};
+
+screens.tutorial = () => {
+  const step = S.tutorialStep || 1;
+  const info = [
+    { t: '1. Pull out the tray', b: 'Slide the sample tray out from the chamber before placing the tuna cut.' },
+    { t: '2. Place the sample', b: 'Lay the Sashibo core flat and centered inside the guide outline.' },
+    { t: '3. Close and scan', b: 'Close the tray smoothly and tap Scan / Take photo to grade immediately.' },
+  ][step - 1];
+  return (
+    <Shell idx={2} left={[backBtn('go', 'weight'), helpBtn()]}
+      right={[B(step < 3 ? 'Next' : 'Continue', 'tutNext', '', 'primary', false, 'arrow'), B('Close', 'tutClose', '', 'ghost')]}>
+      <View style={[BODY, { gap: 16, alignItems: 'center', justifyContent: 'center', paddingBottom: 16 }]}>
+        {chip(`Placement Guide · Step ${step} of 3`, 'info')}
+        <ChamberLine w={Math.min(320, Dimensions.get('window').width - 48)} />
+        <Card lift style={{ width: '100%', gap: 8, alignItems: 'center' }}>
+          <Txt k="h1" style={{ textAlign: 'center' }}>{info.t}</Txt>
+          <Txt k="sub" style={{ textAlign: 'center' }}>{info.b}</Txt>
         </Card>
       </View>
     </Shell>
   );
 };
 
-const DESC = { core: 'Round slice from the thick middle of the loin', tail: 'Flat cut from the tail end' };
+const DESC = {
+  core: 'Primary sample · graded first for every fish',
+  tail: 'Supplementary · only needed if Core is Grade C or under 75%',
+};
 screens.sample = () => {
   const s = S.session;
   const card = (t) => {
     const done = s.captures.some((c) => c.type === t);
     const sel = s.sampleTypes.includes(t);
+    const isCore = t === 'core';
     return (
       <Pressable key={t} disabled={done} onPress={() => act('pick', t)}
-        style={[st.cardBtn, { minHeight: 180, borderRadius: 28 }, sel && { borderColor: C.primary, backgroundColor: '#EEF4FF' },
-          sel && { shadowColor: C.primary, shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 5 }, done && { opacity: 0.45 }]}>
+        style={[st.cardBtn, { minHeight: 170, borderRadius: 28 }, sel && { borderColor: C.primary, backgroundColor: '#EEF4FF' },
+        sel && { shadowColor: C.primary, shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 5 }, done && { opacity: 0.45 }]}>
+        <View style={{ position: 'absolute', top: 14, left: 14 }}>
+          {chip(isCore ? 'Primary · Step 1' : 'Supplementary', isCore ? 'info' : 'amber')}
+        </View>
         <View style={{ position: 'absolute', top: 14, right: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: sel || done ? C.primary : '#EEF2FA', alignItems: 'center', justifyContent: 'center' }}>
           {sel || done ? <Icon n="check" s={22} c="#fff" w={3} /> : null}
         </View>
-        <SampleIcon type={t} size={140} />
+        <SampleIcon type={t} size={130} />
         <Txt k="h2">{TYPES[t].name}</Txt>
         <Txt k="sub" style={{ textAlign: 'center' }}>{done ? 'Already graded in this session' : DESC[t]}</Txt>
         <Text style={{ fontSize: 13, fontWeight: '700', color: sel ? C.primary : C.text2 }}>
-          {done ? 'Completed' : sel ? 'Selected' : 'Tap to select'}
+          {done ? 'Completed' : isCore ? 'Required first' : sel ? 'Supplementary included' : 'Tap to include (optional)'}
         </Text>
       </Pressable>
     );
@@ -1527,12 +2065,12 @@ screens.sample = () => {
     <Shell idx={2} left={[backBtn('sampleBack'), helpBtn()]} right={[B('Continue', 'sampleNext', '', 'primary', !canContinue, 'arrow')]}>
       <View style={{ flexGrow: 1, paddingBottom: 8, gap: 10 }}>
         <View style={{ alignItems: 'center', gap: 6, paddingTop: 6 }}>
-          <Txt k="title" style={{ fontSize: 34, textAlign: 'center' }}>Select sample cuts</Txt>
-          <Sub>Select one or both: Sashibo core and/or Tail cut.</Sub>
+          <Txt k="title" style={{ fontSize: 34, textAlign: 'center' }}>Sample workflow</Txt>
+          <Sub>Sashibo core is graded first. Tail cut is supplementary if needed.</Sub>
         </View>
         <Card style={{ gap: 8, backgroundColor: '#F8FBFF', borderColor: '#C9D9F7' }}>
-          <Txt k="h2">Your selection</Txt>
-          <Txt k="sub">{canContinue ? s.sampleTypes.map((t) => TYPES[t].name).join(' + ') : 'Choose at least one sample.'}</Txt>
+          <Txt k="h2">Grading plan</Txt>
+          <Txt k="sub">{s.sampleTypes.includes('tail') ? '1. Sashibo core  →  2. Tail cut (supplementary)' : '1. Sashibo core (Tail cut only if Grade C or <75%)'}</Txt>
         </Card>
         <View style={{ flex: 1, gap: 12 }}>{card('core')}{card('tail')}</View>
       </View>
@@ -1602,68 +2140,87 @@ function Scanner() {
       </Card>
     );
   }
-  
-return (
-  <View style={box}>
-    <CameraView
-      style={StyleSheet.absoluteFill}
-      facing="back"
-      barcodeScannerSettings={{
-        barcodeTypes: ['qr'],
-      }}
-      onBarcodeScanned={({ data }) => {
-        if (!data || pairingInProgress) return;
-        pairWithKiosk(data);
-      }}
-    />
 
-    <View
-      pointerEvents="none"
-      style={{
-        width: '68%',
-        aspectRatio: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Brackets size={190} />
+  return (
+    <View style={box}>
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        barcodeScannerSettings={{
+          barcodeTypes: ['qr'],
+        }}
+        onBarcodeScanned={({ data }) => {
+          if (!data || pairingInProgress) return;
+          pairWithKiosk(data);
+        }}
+      />
+
+      <View
+        pointerEvents="none"
+        style={{
+          width: '68%',
+          aspectRatio: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Brackets size={190} />
+      </View>
+
+      {chip(
+        S.piStatus === 'connecting'
+          ? 'Connecting to Raspberry Pi…'
+          : 'Looking for the kiosk code…',
+        'info',
+        '',
+        {
+          position: 'absolute',
+          top: 14,
+          alignSelf: 'center',
+        }
+      )}
     </View>
-
-    {chip(
-      S.piStatus === 'connecting'
-        ? 'Connecting to Raspberry Pi…'
-        : 'Looking for the kiosk code…',
-      'info',
-      '',
-      {
-        position: 'absolute',
-        top: 14,
-        alignSelf: 'center',
-      }
-    )}
-  </View>
-);
+  );
 }
 
 screens.pair = () => {
   const s = S.session, ok = s.phone === 'connected';
   return (
-    <Shell idx={3} left={[backBtn('go', 'sample'), helpBtn()]} right={[B('Continue', 'pairNext', '', 'primary', !ok, 'arrow')]}>
+    <Shell idx={2} left={[backBtn('go', 'grader'), helpBtn()]} right={[B('Continue', 'pairNext', '', 'primary', !ok, 'arrow')]}>
       <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
-        <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Scan the kiosk</Txt>
-        <Sub>Point your phone at the QR code on the kiosk screen.</Sub>
+        <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Connect to kiosk</Txt>
+        <Sub>Scan the kiosk QR code or connect directly to your Raspberry Pi URL.</Sub>
         {ok ? (
-          <Card style={{ width: '100%', alignItems: 'center', gap: 10, backgroundColor: C.gAbg, borderColor: '#BFE3D2', paddingVertical: 36 }}>
+          <Card style={{ width: '100%', alignItems: 'center', gap: 10, backgroundColor: C.gAbg, borderColor: '#BFE3D2', paddingVertical: 32 }}>
             <Icon n="check" s={56} c={C.gA} w={3} /><Txt k="h2" style={{ color: C.gA }}>Connected</Txt>
-            <Txt k="sub" style={{ color: C.gA }}>{S.kioskId || 'KIOSK-01'}</Txt>
+            <Txt k="sub" style={{ color: C.gA }}>{`${S.kioskId || 'KIOSK-01'} · ${S.piApiUrl}`}</Txt>
+            {B('Disconnect / change', 'repair', '', 'small ghost')}
           </Card>
         ) : (
           <>
+            <Card style={{ width: '100%', gap: 10 }}>
+              <Txt k="label">Direct Raspberry Pi URL</Txt>
+              <TextInput
+                value={S.piUrlDraft}
+                onChangeText={(v) => act('setPiUrlDraft', v)}
+                placeholder="http://127.0.0.1:3000"
+                placeholderTextColor={C.text2}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                style={{
+                  borderWidth: 1, borderColor: C.border, borderRadius: 12,
+                  paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 * TS(),
+                  color: C.navy, backgroundColor: C.canvas, fontFamily: MONO,
+                }}
+              />
+              {B(S.piStatus === 'connecting' ? 'Connecting…' : 'Connect to Raspberry Pi', 'connectPiUrl', '', 'primary', S.piStatus === 'connecting', 'arrow')}
+            </Card>
             <Scanner />
-            {S.scanError ? chip('Not a kiosk code. Try again.', 'err', 'warn', { alignSelf: 'center' }) : null}
+            {S.scanError ? chip(S.scanError, 'err', 'warn', { alignSelf: 'center' }) : null}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8 }}>
               <Image source={IMG.qr} style={{ width: 44, height: 44 }} resizeMode="contain" />
-              <Txt k="det" style={{ flexShrink: 1 }}>Can't find it? Look for the square code on the kiosk screen.</Txt>
+              <Txt k="det" style={{ flexShrink: 1 }}>Or point your phone camera at the square QR code on the kiosk screen.</Txt>
             </View>
             <DemoPill label="Skip for demo" a="skipDemo" icon="arrow" />
           </>
@@ -1799,10 +2356,12 @@ function DemoPill({ label, a, icon = 'camera' }) {
       onPress={() => act(a)}
       accessibilityRole="button" accessibilityLabel={label}
       style={({ pressed }) => [
-        { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+        {
+          alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
           minHeight: 46, paddingHorizontal: 20, borderRadius: 999, backgroundColor: '#E4ECFC',
           borderWidth: 1, borderColor: '#CFDDF6',
-          shadowColor: C.primary, shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+          shadowColor: C.primary, shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2
+        },
         pressed && { transform: [{ scale: 0.98 }], backgroundColor: '#D5E1F8' },
       ]}
     >
@@ -1834,19 +2393,37 @@ screens.align = () => {
 
 /* Step 5: the live phone camera (always the real camera, never an illustration) */
 screens.camera = () => {
-  const s = S.session, t = s.sampleType, linked = s.phone === 'connected';
+  const s = S.session, t = s.sampleType || 'core', linked = s.phone === 'connected';
+  const isTail = t === 'tail';
   return (
-    <Shell idx={5} left={[backBtn('go', 'align'), helpBtn()]}
+    <Shell idx={isTail ? 4 : 3} left={[backBtn('go', isTail ? 'result' : 'grader'), helpBtn()]}
       right={[
         B('Upload image', 'uploadImage', '', '', S.busy || S.picking, 'gallery'),
+        B('Pi camera', 'capturePi', '', '', S.busy || S.picking || !linked, 'camera'),
         B(S.busy ? 'Taking photo…' : 'Take photo', 'capture', '', 'primary', S.busy || S.picking || !linked || !S.camReady, 'camera'),
       ]}>
       <View style={[BODY, { gap: 12, alignItems: 'center', paddingBottom: 8 }]}>
-        <Txt k="title" style={{ fontSize: 34, paddingTop: 6, textAlign: 'center' }}>Take the photo</Txt>
-        <Sub>Keep the sample still and in the outline. No camera? Upload a photo instead.</Sub>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          {chip(isTail ? 'Supplementary · Tail cut' : 'Primary · Sashibo core', isTail ? 'amber' : 'info')}
+          {chip(`${s.recordId} · ${fmtKg(s.weightTenths)}`, '')}
+        </View>
+        <Txt k="title" style={{ fontSize: 32, paddingTop: 2, textAlign: 'center' }}>
+          {isTail ? 'Show the tail cut face' : 'Place the core in the frame'}
+        </Txt>
+        <Sub>{isTail ? 'Face the cut surface to the camera, centered in the guide.' : 'Lay it flat and centered, in even light. Use Pi camera, phone camera, or upload.'}</Sub>
         {camView(t)}
         {S.demo.quality === 'blurry' ? chip('Check focus', 'amber', 'warn', { alignSelf: 'center' }) : null}
       </View>
+      {S.cannotDetermineModal && S.cannotDetermineModal.open ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 60 }}>
+          <Card lift style={{ width: '100%', maxWidth: 410, gap: 14, padding: 22, borderRadius: 24, alignItems: 'center' }}>
+            {chip('Cannot Be Determined', 'err', 'warn')}
+            <Txt k="h1" style={{ fontSize: 20, textAlign: 'center' }}>Cannot Be Determined</Txt>
+            <Txt k="sub" style={{ textAlign: 'center' }}>{S.cannotDetermineModal.message}</Txt>
+            {B('Scan again', 'dismissCannotDetermine', '', 'primary', false, 'camera', { width: '100%' })}
+          </Card>
+        </View>
+      ) : null}
     </Shell>
   );
 };
@@ -1928,35 +2505,107 @@ const valueCard = (s, p) => (
 
 screens.result = () => {
   const s = S.session, c = s.captures[s.captures.length - 1], p = priceFor(s), r = resolve(s);
-  const g = r.status === 'final' ? r.grade : c.label, manual = r.origin === 'manual', pct = Math.round(c.score * 100);
+  const g = r.status === 'final' ? r.grade : c.label, manual = r.origin === 'manual', pct = Math.round(c.score * 1000) / 10;
+  const tailPrompt = Boolean(r.tailNeeded && c.type === 'core');
   return (
-    <Shell idx={6} left={[backBtn('go', 'sample'), B('Retake', 'retakeSaved', '', 'ghost', false, 'refresh'), helpBtn()]}
-      right={[s.captures.length < 2 ? B('Add other sample', 'addOther', '', '', false, 'tag') : null, B('Confirm', 'confirmQuote', '', 'primary', !p.ok, 'check')]}>
-      <View style={[BODY, { gap: 10, paddingBottom: 8 }]}>
-        <Card lift style={{ alignItems: 'center', gap: 2, paddingVertical: 20, backgroundColor: GBG[g] }}>
-          <Txt k="label">{TYPES[c.type].name}</Txt>
-          <Text style={{ fontSize: 84 * TS(), fontWeight: '800', lineHeight: 88 * TS(), color: GC[g] }}>{g}</Text>
-          <Txt k="h2" style={{ color: GC[g] }}>{`Grade ${g}`}</Txt>
-          {manual ? (
-            <View style={{ marginTop: 10, alignItems: 'center', gap: 8 }}>
-              {chip('Manual override', 'amber', 'edit')}
-              <Txt k="det">{`Model suggested ${c.label} at ${pct}%`}</Txt>
-            </View>
+    <Shell idx={5} left={[backBtn('go', 'grader'), B('Retake', 'retakeSaved', '', 'ghost', false, 'refresh'), helpBtn()]}
+      right={[
+        tailPrompt ? B('Capture tail cut', 'captureTail', '', 'primary', false, 'camera') : null,
+        !tailPrompt ? B('Print receipt', 'confirmQuote', '', 'primary', !p.ok, 'print') : null,
+      ]}>
+      <View style={[BODY, { gap: 12, paddingBottom: 8 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <View>
+            <Txt k="title" style={{ fontSize: 30 }}>{tailPrompt ? 'Tail cut needed' : 'Final grade'}</Txt>
+            <Txt k="det">{`${s.recordId} · ${s.grader} · ${fmtKg(s.weightTenths)}`}</Txt>
+          </View>
+          {tailPrompt ? chip('Action needed', 'amber', 'warn') : r.provisional ? chip('Provisional', 'amber', 'warn') : chip('Graded', 'ok', 'check')}
+        </View>
+
+        <Card lift style={{ alignItems: 'center', gap: 6, paddingVertical: 20, backgroundColor: tailPrompt ? C.amberbg : GBG[g], borderColor: tailPrompt ? '#EBD59C' : C.border }}>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <Txt k="label">{TYPES[c.type].name}</Txt>
+            {r.provisional ? chip('Provisional', 'amber', 'warn') : null}
+          </View>
+          {tailPrompt ? (
+            <>
+              <Text style={{ fontSize: 48 * TS(), fontWeight: '800', color: C.navy }}>{`${pct}%`}</Text>
+              <Txt k="sub" style={{ color: C.amber, fontWeight: '700' }}>{`Grade ${g} · ${pct < 75 ? 'Under 75%' : 'Grade C check'}`}</Txt>
+              <View style={{ width: '85%', height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.75)', overflow: 'hidden', marginTop: 4 }}>
+                <View style={{ width: `${Math.min(100, pct)}%`, height: '100%', backgroundColor: C.amber }} />
+              </View>
+              <Txt k="sub" style={{ textAlign: 'center', color: '#5F3B00', marginTop: 6 }}>
+                {r.reason}
+              </Txt>
+            </>
           ) : (
-            <View style={{ width: '80%', marginTop: 10 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Txt k="det">Confidence</Txt><Text style={{ fontWeight: '800', color: GC[g] }}>{pct}%</Text>
+            <>
+              <View style={{ width: 92, height: 92, borderRadius: 46, borderWidth: 4, borderColor: GC[g], alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.6)', marginVertical: 4 }}>
+                <Text style={{ fontSize: 52 * TS(), fontWeight: '800', color: GC[g] }}>{g}</Text>
               </View>
-              <View style={{ height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.7)', overflow: 'hidden' }}>
-                <View style={{ width: `${pct}%`, height: '100%', backgroundColor: GC[g] }} />
-              </View>
-            </View>
+              <Txt k="h2" style={{ color: GC[g] }}>{`Grade ${g}${r.provisional ? ' (Provisional)' : ''}`}</Txt>
+              {manual ? (
+                <View style={{ marginTop: 6, alignItems: 'center', gap: 6 }}>
+                  {chip('Manual override', 'amber', 'edit')}
+                  <Txt k="det">{`Model suggested ${c.label} at ${pct}%`}</Txt>
+                </View>
+              ) : (
+                <View style={{ width: '84%', marginTop: 6 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Txt k="det">Confidence (≥ 75% threshold)</Txt><Text style={{ fontWeight: '800', color: GC[g] }}>{pct}%</Text>
+                  </View>
+                  <View style={{ height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.75)', overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.min(100, pct)}%`, height: '100%', backgroundColor: GC[g] }} />
+                  </View>
+                </View>
+              )}
+            </>
           )}
         </Card>
-        {valueCard(s, p)}
-        {chip('Saved on device', 'ok', 'check', { alignSelf: 'center' })}
-        <DemoPill label={manual ? 'Change override' : 'Not right? Override grade'} a="override" icon="edit" />
+
+        {tailPrompt ? (
+          <Card style={{ gap: 10 }}>
+            <Txt k="h2">Next: Supplementary Tail-Cut</Txt>
+            <Txt k="sub">Scan the Tail-Cut face to combine both model predictions, or mark Tail-Cut unavailable.</Txt>
+            <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+              {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { flex: 1 })}
+              {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { flex: 1 })}
+            </View>
+          </Card>
+        ) : (
+          <>
+            {sampleInfoCard(c, s, [['Sample', TYPES[c.type].name], ['Confidence', `${pct}%`]], null)}
+            {valueCard(s, p)}
+          </>
+        )}
+
+        <DemoPill label={manual ? 'Change override' : 'Override grade'} a="override" icon="edit" />
       </View>
+
+      {tailPrompt && s.tailPromptOpen ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.45)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 50 }}>
+          <Card lift style={{ width: '100%', maxWidth: 440, gap: 14, padding: 20, borderRadius: 26 }}>
+            <View style={{ alignSelf: 'flex-start' }}>{chip(`Sashibo Core · Grade ${g} · ${pct}%`, 'amber')}</View>
+            <Txt k="h1" style={{ fontSize: 22 }}>Is a Tail-Cut sample available?</Txt>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1, borderWidth: 1, borderColor: '#EBD59C', backgroundColor: '#FFF9EC', borderRadius: 16, padding: 10, alignItems: 'center', gap: 4 }}>
+                <SampleIcon type="core" size={56} />
+                <Text style={{ fontWeight: '800', color: C.navy, fontSize: 13 }}>{`Grade ${g} (${pct}%)`}</Text>
+                <Text style={{ color: C.text2, fontSize: 11 }}>{pct < 75 ? 'Under 75%' : 'Grade C'}</Text>
+              </View>
+              <View style={{ flex: 1, borderWidth: 1, borderColor: C.border, backgroundColor: C.canvas, borderRadius: 16, padding: 10, alignItems: 'center', gap: 4 }}>
+                <SampleIcon type="tail" size={56} />
+                <Text style={{ fontWeight: '800', color: C.navy, fontSize: 13 }}>2nd Check</Text>
+                <Text style={{ color: C.text2, fontSize: 11 }}>Combines both</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {B('Scan Tail-Cut', 'captureTail', '', 'primary', false, 'camera', { flex: 1 })}
+              {B('No Tail-Cut', 'tailNotAvailable', '', '', false, '', { flex: 1 })}
+            </View>
+          </Card>
+        </View>
+      ) : null}
     </Shell>
   );
 };
@@ -1965,7 +2614,7 @@ screens.invalid = () => {
   const s = S.session, c = s.captures[s.captures.length - 1]; const inv = c.outcome === 'invalid';
   const hasOther = s.captures.some((x) => x.id !== c.id && x.outcome === 'accepted');
   return (
-    <Shell idx={6} left={[backBtn('go', 'sample'), helpBtn()]} right={[hasOther ? B('Discard sample', 'discardSample', '', 'small danger') : null, !inv ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Retake', 'retakeSaved', '', 'primary', false, 'refresh')]}>
+    <Shell idx={5} left={[backBtn('go', 'grader'), helpBtn()]} right={[hasOther ? B('Discard sample', 'discardSample', '', 'small danger') : null, !inv ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Retake', 'retakeSaved', '', 'primary', false, 'refresh')]}>
       <View style={[BODY, { paddingBottom: 8, gap: 10 }]}>
         <Card lift style={{ alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: inv ? C.warnbg : C.amberbg }}>
           {inv ? chip('Image rejected', '', 'warn') : chip('Needs another look', 'amber', 'warn')}
@@ -1981,43 +2630,77 @@ screens.invalid = () => {
 };
 
 screens.paired = () => {
-  const s = S.session, r = resolve(s);
+  const s = S.session, r = resolve(s), p = priceFor(s);
   const ecaps = effCaps(s);
   const caps = ['core', 'tail'].map((t) => ecaps.find((c) => c.type === t)).filter(Boolean);
+  const avgPct = caps.length ? Math.round((caps.reduce((acc, c) => acc + (c.score || 0), 0) / caps.length) * 1000) / 10 : 0;
   const panel = (c) => {
-    const acc = c.outcome === 'accepted';
+    const pct = Math.round((c.score || 0) * 1000) / 10;
     return (
-      <Card key={c.type} style={{ gap: 16 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <Txt k="h2">{TYPES[c.type].name}</Txt>
-          {c.overridden ? chip('Overridden', 'amber', 'edit') : acc ? chip('Accepted', 'ok', 'check') : c.outcome === 'uncertain' ? chip('Uncertain', 'amber', 'warn') : chip('Rejected', '', 'warn')}
+      <Card key={c.type} style={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          {chip(c.type === 'core' ? 'Core' : 'Tail', '')}
+          {chip(`Grade ${c.label} · ${pct}%`, c.outcome === 'accepted' ? 'ok' : 'amber')}
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-          <ImgFrame style={{ width: 130, height: 98 }}>{imgFor(c)}</ImgFrame>
-          <View style={{ flex: 1, gap: 8 }}>
-            <Text style={{ fontSize: 56 * TS(), fontWeight: '700', lineHeight: 56 * TS(), color: acc ? GC[c.label] : C.text2 }}>{acc ? c.label : '—'}</Text>
-            <Txt k="sub">{c.overridden ? `Model: ${capText(c.raw)}` : acc ? `Model score ${Math.round(c.score * 100)}%` : c.outcome === 'uncertain' ? `Closest: ${c.label}, ${Math.round(c.score * 100)}%` : 'Rejected input'}</Txt>
-          </View>
-        </View>
+        <ImgFrame style={{ width: '100%', height: 120 }}>{imgFor(c)}</ImgFrame>
+        <Txt k="det">{`${TYPES[c.type].name}${c.overridden ? ` (Override · Model: ${capText(c.raw)})` : ''}`}</Txt>
       </Card>
     );
   };
-  const banner = (bg, bc, icon, ic, title, tc, sub, subc) => (
-    <Card style={{ flexDirection: 'row', gap: 16, alignItems: 'center', backgroundColor: bg, borderColor: bc }}>
-      <Icon n={icon} s={36} c={ic} w={icon === 'check' ? 3 : 2.4} />
-      <View style={{ flex: 1 }}><Txt k="h2" style={{ color: tc }}>{title}</Txt><Txt k="sub" style={subc ? { color: subc } : null}>{sub}</Txt></View>
-    </Card>
-  );
-  const lastDec = s.decisions.slice(-1)[0];
-  let bn;
-  if (r.status === 'final') bn = banner(C.gAbg, '#BFE3D2', 'check', C.gA, `${r.origin === 'model' ? 'Samples agree' : r.origin === 'manual' ? 'Manual override' : 'Expert decision'}: Grade ${r.grade}`, C.gA, r.origin !== 'model' && lastDec ? lastDec.reason : 'Each result stays separate. TunaEye does not average or combine scores.');
-  else if (r.conflict) bn = banner(C.amberbg, '#EBD59C', 'warn', C.amber, 'Expert decision required', C.amber, 'Core and tail disagree. Override one sample, or have an expert decide, before pricing.', '#5F3B00');
-  else bn = banner(C.amberbg, '#EBD59C', 'warn', C.amber, 'Not ready for a price', C.amber, `${r.reason || ''}. Retake the sample or ask an expert.`, '#5F3B00');
-  const retakeCap = caps.find((c) => c.outcome !== 'accepted');
+  const fg = r.status === 'final' ? r.grade : null;
+  const retakeCap = caps.find((c) => c.outcome !== 'accepted') || caps[caps.length - 1];
   return (
-    <Shell idx={6} left={[backBtn('go', 'sample'), retakeCap ? B('Retake ' + TYPES[retakeCap.type].short, 'retakeType', retakeCap.type, '', '', 'refresh') : null, helpBtn()]}
-      right={[r.status !== 'final' ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Continue to price', 'toPrice', '', 'primary', r.status !== 'final', 'arrow')]}>
-      <View style={[BODY, { gap: 16 }]}>{caps.map(panel)}{bn}<DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a="override" icon="edit" /></View>
+    <Shell idx={5} left={[backBtn('go', 'grader'), retakeCap ? B('Retake', 'retakeType', retakeCap.type, '', '', 'refresh') : null, helpBtn()]}
+      right={[r.status !== 'final' ? B('Expert review', 'expert', '', '', '', 'lock') : null, B('Print receipt', 'confirmQuote', '', 'primary', !p.ok, 'print')]}>
+      <View style={[BODY, { gap: 14, paddingBottom: 8 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <View>
+            <Txt k="title" style={{ fontSize: 30 }}>Final grade</Txt>
+            <Txt k="det">{`${s.recordId} · ${s.grader} · ${fmtKg(s.weightTenths)}`}</Txt>
+          </View>
+          {r.status === 'final' ? chip('Graded', 'ok', 'check') : chip('Action needed', 'amber', 'warn')}
+        </View>
+
+        {fg ? (
+          <Card lift style={{ alignItems: 'center', gap: 10, paddingVertical: 22, backgroundColor: GBG[fg] }}>
+            <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: GC[fg], alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.65)' }}>
+              <Text style={{ fontSize: 50 * TS(), fontWeight: '800', color: GC[fg] }}>{fg}</Text>
+            </View>
+            <Txt k="h1" style={{ color: GC[fg] }}>{`Grade ${fg}`}</Txt>
+            <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.75)' }}>
+              <Text style={{ fontWeight: '800', color: C.navy, fontSize: 13 }}>{`Avg confidence  ${avgPct}%`}</Text>
+            </View>
+            <View style={{ width: '90%', gap: 8, marginTop: 6 }}>
+              {caps.map((c) => {
+                const cpct = Math.round((c.score || 0) * 1000) / 10;
+                return (
+                  <View key={c.type} style={{ gap: 4 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: C.navy }}>{`${TYPES[c.type].short} · Grade ${c.label}`}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: C.navy }}>{`${cpct}%`}</Text>
+                    </View>
+                    <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.7)', overflow: 'hidden' }}>
+                      <View style={{ width: `${Math.min(100, cpct)}%`, height: '100%', backgroundColor: GC[fg] }} />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </Card>
+        ) : (
+          <Card style={{ flexDirection: 'row', gap: 14, alignItems: 'center', backgroundColor: C.amberbg, borderColor: '#EBD59C' }}>
+            <Icon n="warn" s={34} c={C.amber} />
+            <View style={{ flex: 1 }}>
+              <Txt k="h2" style={{ color: C.amber }}>Manual override required</Txt>
+              <Txt k="sub" style={{ color: '#5F3B00' }}>{r.reason || 'Override or ask an expert before pricing.'}</Txt>
+            </View>
+          </Card>
+        )}
+
+        {valueCard(s, p)}
+        <View style={{ gap: 10 }}>{caps.map(panel)}</View>
+        <DemoPill label={s.decisions.some((d) => d.manual) ? 'Change override' : 'Override grade'} a="override" icon="edit" />
+      </View>
     </Shell>
   );
 };
@@ -2042,7 +2725,7 @@ screens.override = () => {
   const two = s.captures.length > 1;
   const tg = two ? S.ui.ovTarget : 'all';
   const has = s.decisions.some((d) => d.manual);
-  const ok = !!g && !!tg && reason.length >= 5 && S.ui.ovAck;
+  const ok = !!g && !!tg && reason.length >= 3 && S.ui.ovPin.length === 4;
   const ecaps = effCaps(s);
   const shown = two && tg && tg !== 'all' ? ecaps.filter((c) => c.type === tg) : ecaps;
   // Preview the price with the override applied (nothing is saved until "Apply override").
@@ -2052,7 +2735,7 @@ screens.override = () => {
     return (
       <Pressable key={x} onPress={() => act('ovGrade', x)} accessibilityRole="button" accessibilityLabel={`Grade ${x}`}
         style={({ pressed }) => [{ flex: 1, minHeight: 124, borderRadius: 24, borderWidth: 3, borderColor: sel ? GC[x] : C.border, backgroundColor: sel ? GBG[x] : C.surface, alignItems: 'center', justifyContent: 'center', gap: 2 },
-          sel && { shadowColor: GC[x], shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 4 }, pressed && { transform: [{ scale: 0.97 }] }]}>
+        sel && { shadowColor: GC[x], shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 4 }, pressed && { transform: [{ scale: 0.97 }] }]}>
         <Text style={{ fontSize: 52 * ts, fontWeight: '800', lineHeight: 58 * ts, color: GC[x] }}>{x}</Text>
         <Text style={{ fontSize: 12.5 * ts, color: C.text2 }}>{`${fmtMoney(S.schedule.rates[x])}/kg`}</Text>
         {sel ? <View style={{ position: 'absolute', top: 8, right: 8 }}><Icon n="check" s={20} c={GC[x]} w={3} /></View> : null}
@@ -2106,6 +2789,20 @@ screens.override = () => {
           <View style={{ flexDirection: 'row', gap: 10 }}>{['A', 'B', 'C'].map(tile)}</View>
           {hyp && hyp.ok ? chip(`New estimate ${fmtMoney(hyp.total)}`, 'info', 'tag', { alignSelf: 'center', marginTop: 4 }) : null}
           {hyp && !hyp.ok ? chip(hyp.kind === 'grade' ? 'The samples would still disagree. Override the other sample too.' : hyp.why, 'amber', 'warn', { alignSelf: 'center', marginTop: 4 }) : null}
+        </View>
+        <View style={{ gap: 8 }}>
+          <Txt k="h2">Supervisor PIN</Txt>
+          <TextInput
+            value={S.ui.ovPin}
+            onChangeText={(v) => { S.ui.ovPin = v.replace(/\D/g, '').slice(0, 4); S.ui.ovPinError = ''; render(); }}
+            placeholder="4-digit PIN (e.g. 1234 or 2468)"
+            placeholderTextColor={C.text2}
+            keyboardType="number-pad"
+            secureTextEntry
+            maxLength={4}
+            style={[st.field, { borderRadius: 14, minHeight: 50 }]}
+          />
+          {S.ui.ovPinError ? <Text style={{ color: C.err, fontSize: 13 }}>{S.ui.ovPinError}</Text> : null}
         </View>
         <View style={{ gap: 8 }}>
           <Txt k="h2">Why are you overriding?</Txt>
@@ -2195,16 +2892,16 @@ screens.receipt = () => {
   const s = S.session, r = S.records.find((x) => x.id === s.recordId), pr = S.print;
   const sending = pr && pr.state === 'sending', sent = pr && pr.state === 'sent';
   return (
-    <Shell idx={7} left={[helpBtn()]}
+    <Shell idx={6} left={[helpBtn()]}
       right={[
         B('Print receipt', 'print', '', 'primary', sending, 'print'),
-        B('Save receipt copy', 'saveGallery', '', '', false, 'gallery'),
-        B('Done', 'go', 'completion', 'ghost', sending)
+        B('Skip', 'skipReceipt', '', '', sending),
+        B('Done', 'doneReceipt', '', 'ghost', sending),
       ]}>
       <View style={[BODY, { gap: 10, paddingBottom: 8 }]}>
         <View style={{ alignItems: 'center', gap: 6, paddingTop: 6 }}>
-          <Txt k="title" style={{ fontSize: 34 }}>Receipt</Txt>
-          <Sub>Choose how you want to keep the receipt: print it or keep a copy on the phone.</Sub>
+          <Txt k="title" style={{ fontSize: 34 }}>Receipt (58mm)</Txt>
+          <Sub>Print the thermal receipt or skip to save locally and continue.</Sub>
         </View>
         <View style={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}>
           <View style={{ transform: [{ scale: 0.92 }] }}>
@@ -2218,6 +2915,18 @@ screens.receipt = () => {
           {pr && pr.state === 'error' ? chip('Print failed — try again', 'err', 'x', { alignSelf: 'center' }) : null}
         </View>
       </View>
+      {S.skipReceiptModal ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,27,43,0.48)', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 60 }}>
+          <Card lift style={{ width: '100%', maxWidth: 400, gap: 14, padding: 22, borderRadius: 24 }}>
+            <Txt k="h1" style={{ fontSize: 22 }}>Skip printing?</Txt>
+            <Txt k="sub">The record remains saved locally.</Txt>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {B('Cancel', 'cancelSkipReceipt', '', '', false, '', { flex: 1 })}
+              {B('Skip & finish', 'confirmSkipReceipt', '', 'primary', false, 'arrow', { flex: 1 })}
+            </View>
+          </Card>
+        </View>
+      ) : null}
     </Shell>
   );
 };
@@ -2225,21 +2934,38 @@ screens.receipt = () => {
 screens.history = () => {
   const sel = S.ui.histSel ? S.records.find((r) => r.id === S.ui.histSel) : null;
   if (sel) return histDetail(sel);
-  const list = histList();
+  const graderName = S.lastGrader || S.session?.grader || '';
+  const scope = S.ui.histScope || 'mine';
+  const allList = getDashboardHistory(S.records, graderName, scope);
+  const pageSize = 8;
+  const pageCount = Math.max(1, Math.ceil(allList.length / pageSize));
+  const page = Math.min(S.ui.histPage || 0, pageCount - 1);
+  const list = allList.slice(page * pageSize, (page + 1) * pageSize);
   return (
     <Shell idx={0} left={[backBtn('go', 'welcome'), helpBtn()]}>
       <View style={[BODY, { gap: 12, justifyContent: 'flex-start', paddingTop: 12 }]}>
         <View style={{ alignItems: 'center', gap: 6 }}>
-          <Txt k="title" style={{ fontSize: 34, textAlign: 'center' }}>History</Txt>
-          <Sub>Tap a tuna to see its grade, price and photos.</Sub>
+          <Txt k="title" style={{ fontSize: 32, textAlign: 'center' }}>Grader Dashboard</Txt>
+          <Sub>{scope === 'mine' ? `Showing records for ${graderName || 'current grader'}` : 'Showing all device records'}</Sub>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
+          {B('My records', 'histScope', 'mine', scope === 'mine' ? 'primary' : '', false, '', { flex: 1 })}
+          {B('All device records', 'histScope', 'all', scope === 'all' ? 'primary' : '', false, '', { flex: 1 })}
         </View>
         {list.length ? list.map((r) => <HistRow key={r.id} r={r} />) : (
           <Card style={{ alignItems: 'center', gap: 10, padding: 40 }}>
             <Icon n="list" s={44} c="#7FA6D1" />
-            <Txt k="h2">No grades yet</Txt>
-            <Txt k="sub" style={{ textAlign: 'center' }}>Finished gradings will show up here.</Txt>
+            <Txt k="h2">No records yet</Txt>
+            <Txt k="sub" style={{ textAlign: 'center' }}>{scope === 'mine' ? 'Your completed gradings will appear here.' : 'Finished gradings will show up here.'}</Txt>
           </Card>
         )}
+        {pageCount > 1 ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            {B('Prev', 'histPrev', '', '', page === 0)}
+            <Txt k="det">{`Page ${page + 1} of ${pageCount}`}</Txt>
+            {B('Next', 'histNext', '', '', page >= pageCount - 1)}
+          </View>
+        ) : null}
       </View>
     </Shell>
   );
@@ -2483,11 +3209,11 @@ screens.diag = () => {
     <Shell idx={0} left={[backBtn('go', 'console'), helpBtn()]}>
       <Card style={{ marginTop: 8, marginBottom: 16 }}>
         <Txt k="h2" style={{ marginBottom: 8 }}>Device status</Txt>
-        {row('Phone camera', 'Scans the kiosk QR, views and photographs the sample', 'info', 1)}{row('Model', 'No real model loaded', 'amber')}{row('Storage', 'Writable (device memory)', 'info', 1)}
-       {row('Raspberry Pi',
-  S.piStatus === 'connected' ? 'Connected' : S.piStatus === 'connecting' ? 'Checking…' : S.piStatus === 'error' ? 'Not reachable' : 'Not checked',
-  S.piStatus === 'connected' ? 'ok' : S.piStatus === 'error' ? 'err' : 'amber', 0)}
-{B('Check Raspberry Pi', 'checkPi', '', 'small')}
+        {row('Phone camera', 'Scans the kiosk QR, views and photographs the sample', 'info', 1)}{row('Model', S.piStatus === 'connected' ? 'Raspberry Pi ready' : 'Check Raspberry Pi connection', S.piStatus === 'connected' ? 'ok' : 'amber')}{row('Storage', 'Writable (device memory)', 'info', 1)}
+        {row('Raspberry Pi',
+          S.piStatus === 'connected' ? `Connected (${S.piApiUrl})` : S.piStatus === 'connecting' ? 'Checking…' : S.piStatus === 'error' ? `Not reachable (${S.piApiUrl})` : `Not checked (${S.piApiUrl})`,
+          S.piStatus === 'connected' ? 'ok' : S.piStatus === 'error' ? 'err' : 'amber', 0)}
+        {B('Check Raspberry Pi', 'checkPi', '', 'small')}
         {row('Cloud', S.net === 'online' ? 'Reachable' : S.net === 'wifi' ? 'Wi-Fi only' : 'Offline', S.net === 'online' ? 'ok' : 'amber')}
         {row('Inter font', 'Not loaded · system sans in use', 'amber', 0, true)}
       </Card>
@@ -2522,6 +3248,24 @@ screens.settings = () => (
         <Txt k="h2">Display</Txt><Txt k="sub">Text size</Txt>
         <View style={{ flexDirection: 'row', gap: 16 }}>{B('Normal', 'textsize', 'n', S.ui.large ? '' : 'primary', '', '', { flex: 1 })}{B('Large', 'textsize', 'l', S.ui.large ? 'primary' : '', '', '', { flex: 1 })}</View>
         <Txt k="det">Large text is for checking layouts at higher text scaling.</Txt>
+      </Card>
+      <Card style={{ gap: 16 }}>
+        <Txt k="h2">Raspberry Pi connection</Txt>
+        <TextInput
+          value={S.piUrlDraft}
+          onChangeText={(v) => act('setPiUrlDraft', v)}
+          placeholder="http://127.0.0.1:3000"
+          placeholderTextColor={C.text2}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          style={{
+            borderWidth: 1, borderColor: C.border, borderRadius: 12,
+            paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 * TS(),
+            color: C.navy, backgroundColor: C.canvas, fontFamily: MONO,
+          }}
+        />
+        {B('Save & test Raspberry Pi', 'savePiUrl', '', 'primary')}
       </Card>
       <Card style={{ gap: 16 }}>
         <Txt k="h2">Shift and limits</Txt>
@@ -2685,6 +3429,13 @@ function Drawer() {
 /* ====================================================================== */
 /** Load locally persisted records. Real records survive restarts; demo fixtures are never synced. */
 async function hydrateRecords() {
+  try {
+    const savedPiUrl = normalizePiUrl(await AsyncStorage.getItem(PI_URL_STORAGE_KEY));
+    if (savedPiUrl && /^https?:\/\//i.test(savedPiUrl)) {
+      S.piApiUrl = savedPiUrl;
+      S.piUrlDraft = savedPiUrl;
+    }
+  } catch { }
   const stored = await loadStoredRecords();
   for (const r of stored) if (!r.closed && r.captures.length && r.sync === 'local') { r.closed = true; r.sync = 'pending'; r.offlineOrigin = true; } // app was killed mid-session: keep the graded result
   const demo = isSupabaseConfigured() ? [] : S.records.filter((r) => r.demo);
@@ -2694,7 +3445,7 @@ export default function App() {
   const [, force] = useReducer((x) => x + 1, 0);
   rerender = force;
   useEffect(() => {
-    let alive = true; let unsub = () => {};
+    let alive = true; let unsub = () => { };
     const netState = (st) => (!st.isConnected ? 'offline' : st.isInternetReachable === false ? 'wifi' : 'online');
     (async () => {
       await hydrateRecords();
@@ -2703,12 +3454,21 @@ export default function App() {
       if (st && alive) S.net = netState(st);
       runStartup();
       if (S.net === 'online') syncNow(); // pending records from earlier sessions
-      unsub = NetInfo.addEventListener((next) => {
+      unsub = NetInfo.addEventListener(async (next) => {
         const was = S.net; S.net = netState(next); render();
-        if (S.net === 'online' && was !== 'online') syncNow(); // connectivity-triggered, not polling/Realtime
+        if (S.net === 'online' && was !== 'online') {
+          try {
+            const queued = JSON.parse((await AsyncStorage.getItem(PENDING_SYNC_GRADERS_KEY)) || 'null');
+            if (Array.isArray(queued) && queued.length) {
+              syncPendingRecords({ limit: 200, graders: queued });
+              return;
+            }
+          } catch {}
+          syncNow(); // connectivity-triggered, not polling/Realtime
+        }
       });
     })();
-    return () => { alive = false; unsub(); clearTimers(); rerender = () => {}; };
+    return () => { alive = false; unsub(); clearTimers(); rerender = () => { }; };
   }, []);
   const fn = screens[S.screen];
   const hero = HERO_SCREENS.includes(S.screen);
